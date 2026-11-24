@@ -1,0 +1,25 @@
+================================================================================
+TODO - TESTS & VÉRIFICATIONS POUR LA PROCHAINE SESSION
+================================================================================
+
+Tests manuels restants sur la V1 :
+[ ] Export .zip :
+    - Exporter une infrastructure contenant db-1 (init.sql) et pc-1 (workspace/)
+    - Vérifier le contenu de l'archive (infra.json, configs/, docker-compose.yml)
+[ ] Import .zip :
+    - Ré-importer l'archive depuis le tableau de bord (avec renommage)
+    - Vérifier que les positions, liens, init.sql et workspace/ sont intacts
+    - Démarrer l'infrastructure importée
+[ ] Partage en lecture seule (avec 2 comptes) :
+    - Partager une infrastructure à un second compte (ex. eleve)
+    - Vérifier l'espace « Partagées avec moi » et le mode lecture seule dans
+      l'atelier (modification / démarrage / double-clic bloqués, export .zip OK)
+[ ] Images Debian/Ubuntu & double-clic :
+    - Vérifier que ./docker/build-images.sh s'est bien terminé
+    - Tester apt dans le terminal web (double-clic sur pc-1)
+    - Tester la console SQL (double-clic sur db-1)
+    - Tester le bureau Ubuntu XFCE + Wireshark (double-clic sur desk-1)
+[ ] Isolation multi-infrastructures :
+    - Démarrer 2 infrastructures en même temps et vérifier les deux /24 distincts
+    - Arrêter et vérifier que conteneurs + réseaux sont bien supprimés
+================================================================================
