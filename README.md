@@ -43,3 +43,4 @@ L'API sera disponible sur `http://localhost:8000`.
 
 ### 3. Front-end
 Vous pouvez ouvrir `frontend/public/index.html` directement dans un navigateur ou utiliser un serveur statique local.
+

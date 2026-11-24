@@ -11,28 +11,31 @@
         <h1>Plateforme d'Infrastructures Virtuelles</h1>
         <nav>
             <a href="../index.html">Accueil</a>
-            <button onclick="logout()" style="margin-left: 1rem; cursor: pointer; padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 4px;">Déconnexion</button>
+            <span id="user-badge" class="user-badge"></span>
+            <button onclick="logout()" class="btn-danger">Déconnexion</button>
         </nav>
     </header>
-    
+
     <main>
         <h2>Tableau de bord</h2>
-        <p>Bienvenue dans votre espace de travail. Vous pouvez ici créer, sauvegarder et partager vos infrastructures virtuelles.</p>
-        
-        <div id="infra-workspace" style="margin-top: 2rem; padding: 2rem; background: #fff; border: 2px dashed #cbd5e1; text-align: center;">
-            <p><em>Interface visuelle « plug & play » à venir...</em></p>
+        <p id="welcome-text">Chargement de votre espace de travail...</p>
+
+        <div id="infra-workspace" class="workspace-placeholder">
+            <p><em>Interface visuelle « plug &amp; play » à venir (Étapes 1 à 4)...</em></p>
         </div>
     </main>
 
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
     <script>
-        window.onload = () => {
-            if (!isAuthenticated()) {
-                alert("Vous devez être connecté pour accéder au tableau de bord.");
-                window.location.href = 'login.html';
-            }
-        };
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = await requireAuth();
+            if (!user) return;
+
+            document.getElementById('user-badge').textContent = `${user.username} (${user.email})`;
+            document.getElementById('welcome-text').textContent =
+                `Bienvenue ${user.username} ! Vous pourrez ici créer, sauvegarder et partager vos infrastructures virtuelles.`;
+        });
     </script>
 </body>
 </html>

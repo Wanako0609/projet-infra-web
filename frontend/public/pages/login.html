@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - Infra Web</title>
-    <!-- On remonte d'un dossier (../) pour chercher css/ -->
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -12,32 +11,47 @@
         <h1>Plateforme d'Infrastructures Virtuelles</h1>
         <nav>
             <a href="../index.html">Accueil</a>
+            <a href="register.html">Inscription</a>
         </nav>
     </header>
-    
+
     <main>
-        <h2>Connexion</h2>
-        <form id="login-form" onsubmit="handleLogin(event)">
-            <div style="margin-bottom: 1rem;">
-                <label for="username">Nom d'utilisateur :</label><br>
-                <input type="text" id="username" required>
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label for="password">Mot de passe :</label><br>
-                <input type="password" id="password" required>
-            </div>
-            <button type="submit">Se connecter</button>
-        </form>
+        <section class="auth-card">
+            <h2>Connexion</h2>
+            <p id="auth-message" class="form-message" hidden></p>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="username">Nom d'utilisateur</label>
+                    <input type="text" id="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-primary">Se connecter</button>
+            </form>
+            <p class="auth-switch">Pas encore de compte ? <a href="register.html">Créer un compte</a></p>
+        </section>
     </main>
 
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
     <script>
-        function handleLogin(event) {
+        async function handleLogin(event) {
             event.preventDefault();
-            const user = document.getElementById('username').value;
+            const messageEl = document.getElementById('auth-message');
+            messageEl.hidden = true;
+
+            const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
-            loginUser(user, pass);
+
+            try {
+                await loginUser(user, pass);
+            } catch (error) {
+                messageEl.textContent = error.message;
+                messageEl.className = 'form-message error';
+                messageEl.hidden = false;
+            }
         }
     </script>
 </body>

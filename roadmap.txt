@@ -1,0 +1,149 @@
+================================================================================
+ROADMAP - PLATEFORME WEB DE DÉPLOIEMENT D'INFRASTRUCTURES VIRTUELLES
+================================================================================
+
+Objectif global (V1) :
+Permettre à des utilisateurs authentifiés de concevoir visuellement une
+infrastructure informatique (glisser-déposer de modules + liens réseau), de la
+déployer de façon isolée via Docker, d'interagir avec chaque brique depuis le
+navigateur, et de la sauvegarder / exporter / importer / partager en lecture
+seule.
+
+--------------------------------------------------------------------------------
+ÉTAT ACTUEL (DÉJÀ EN PLACE)
+--------------------------------------------------------------------------------
+[x] Environnement de dev local :
+    - PostgreSQL 15 via docker-compose.yml (base de la plateforme)
+    - Script dev.sh (lance Postgres, FastAPI sur :8000, front statique sur :3000)
+[x] Back-end FastAPI (backend/) :
+    - Connexion PostgreSQL via SQLAlchemy (app/services/db.py)
+    - Modèle User + schémas Pydantic (app/models/user.py, app/schemas/user.py)
+    - Hachage bcrypt + génération/vérification JWT (app/core/security.py)
+    - Routes POST /api/auth/register, POST /api/auth/login, GET /api/users/me
+[x] Front-end HTML/CSS/JS (frontend/public/) :
+    - Pages index.html, pages/login.html, pages/dashboard.html (placeholder)
+    - Helper apiFetch avec injection du Bearer token (js/api.js)
+    - Fonctions registerUser, loginUser, logout (js/auth.js)
+[x] Dépôt Git initialisé et poussé sur GitHub (branche main).
+
+--------------------------------------------------------------------------------
+ÉTAPE 0 : CONSOLIDER LE SOCLE (AUTH, CONFIG & GIT)                    [TERMINÉE]
+--------------------------------------------------------------------------------
+Objectif : Corriger les petits défauts de la base existante avant d'empiler de
+nouvelles fonctionnalités, et maîtriser le cycle complet Auth JWT <-> API.
+
+Réalisé :
+[x] PDF de présentation ajouté dans .gitignore (jamais poussé sur GitHub).
+[x] Config back-end (backend/app/core/config.py) :
+    - Chargement automatique de backend/.env via pydantic-settings.
+    - Driver PostgreSQL par défaut aligné avec requirements.txt (psycopg v3).
+[x] Sécurité JWT & mots de passe (backend/app/core/security.py) :
+    - Expiration JWT en UTC (datetime.now(timezone.utc)).
+    - Remplacement de passlib par bcrypt direct (corrige le crash passlib +
+      bcrypt récent, tout en restant compatible avec les hash $2b$).
+    - Vérification de user.is_active dans get_current_user.
+[x] Front-end Auth (frontend/public/) :
+    - Ajout de isAuthenticated(), fetchCurrentUser() et requireAuth() qui
+      valide réellement le token auprès de GET /api/users/me.
+    - Affichage de l'utilisateur connecté dans le tableau de bord.
+    - Création de la page d'inscription (pages/register.html) + messages
+      d'erreur intégrés aux formulaires (au lieu de alert()).
+    - Chemins de redirection sécurisés entre la racine et /pages/.
+
+--------------------------------------------------------------------------------
+ÉTAPE 1 : MODÈLE DE DONNÉES, CATALOGUE DE MODULES & PARTAGE            [À FAIRE]
+--------------------------------------------------------------------------------
+Objectif : Persister les infrastructures en base, définir les briques autorisées
+et gérer les droits (propriétaire vs partage en lecture seule).
+
+À faire :
+[ ] Définir le catalogue de modules vérifiés côté back-end (GET /api/modules) :
+    - Léger     : Base SQL (ex. PostgreSQL ~150 Mo)
+    - Réseau    : Poste Linux minimal avec outils réseau (~200 Mo)
+    - Graphique : Poste Linux avec bureau web à la demande (~800 Mo)
+    (avec images autorisées, ports/services, limites RAM/CPU).
+[ ] Créer les tables SQLAlchemy :
+    - infrastructures (id, name, description, owner_id, definition JSONB,
+      status, created_at, updated_at)
+    - infrastructure_shares (infra_id, user_id, permission='read_only')
+[ ] Créer les routes API REST (/api/infrastructures) :
+    - Lister mes infrastructures + celles partagées avec moi
+    - Créer / consulter / modifier / supprimer (vérification stricte des droits)
+    - Partager / retirer le partage avec un autre utilisateur (lecture seule)
+[ ] Afficher les deux espaces sur le dashboard :
+    - « Mes infrastructures » (édition / déploiement / partage)
+    - « Partagées avec moi » (consultation en lecture seule)
+
+--------------------------------------------------------------------------------
+ÉTAPE 2 : FORMAT DE FICHIER DÉDIÉ (EXPORT & IMPORT)                    [À FAIRE]
+--------------------------------------------------------------------------------
+Objectif : Permettre la sauvegarde portable et le partage hors-ligne d'une
+infrastructure via un fichier validé.
+
+À faire :
+[ ] Formaliser un schéma Pydantic versionné (ex. schema_version: "1.0",
+    métadonnées, liste des modules + positions + configs, liens réseau).
+[ ] Endpoint GET /api/infrastructures/{id}/export (téléchargement du fichier).
+[ ] Endpoint POST /api/infrastructures/import (validation stricte contre le
+    catalogue de modules + création dans l'espace personnel).
+[ ] Boutons Exporter / Importer sur l'interface web.
+
+--------------------------------------------------------------------------------
+ÉTAPE 3 : MOTEUR D'ORCHESTRATION DOCKER                                [À FAIRE]
+--------------------------------------------------------------------------------
+Objectif : Transformer une définition d'infrastructure en vrais conteneurs
+isolés qui communiquent entre eux.
+
+À faire :
+[ ] Créer un service dédié (backend/app/services/docker_orchestrator.py) via le
+    SDK Python docker.
+[ ] Isolation réseau : créer un réseau Docker bridge dédié par infrastructure
+    déployée (ex. infra_<id>_net) avec résolution DNS par nom de module.
+[ ] Préparer les images vérifiées :
+    - Image PostgreSQL (configuration mot de passe / BDD via variables d'env)
+    - Dockerfile poste Linux réseau (iproute2, ping, tcpdump, curl, netcat...)
+    - Image poste Linux graphique à la demande (bureau léger + noVNC/KasmVNC)
+[ ] Cycle de vie & sécurité :
+    - Routes POST /start, POST /stop, GET /status (état temps réel des modules)
+    - Nettoyage propre des conteneurs et réseaux à l'arrêt
+    - Quotas RAM/CPU, liste blanche d'images, pas de montage hôte non autorisé.
+
+--------------------------------------------------------------------------------
+ÉTAPE 4 : INTERFACE VISUELLE « PLUG & PLAY » (CANEVAS)                 [À FAIRE]
+--------------------------------------------------------------------------------
+Objectif : Construire et piloter une infrastructure à la souris depuis le
+navigateur.
+
+À faire :
+[ ] Intégrer un canevas interactif (glisser-déposer des modules du catalogue,
+    positionnement libre, zoom/déplacement).
+[ ] Tracer et supprimer des liens réseau entre modules.
+[ ] Panneau d'actions : Sauvegarder, Exporter, Démarrer / Arrêter l'infra,
+    statut visuel de chaque module (arrêté / démarré / erreur).
+[ ] Mode lecture seule : verrouiller toute modification sur les infras partagées.
+
+--------------------------------------------------------------------------------
+ÉTAPE 5 : ACCÈS AUX MODULES PAR DOUBLE-CLIC                            [À FAIRE]
+--------------------------------------------------------------------------------
+Objectif : Rendre chaque brique réellement manipulable dans le navigateur.
+
+À faire :
+[ ] Double-clic sur une Base de données :
+    - Panneau de configuration (mot de passe, nom de BDD)
+    - Interface de gestion / exécution SQL pour créer et consulter des tables.
+[ ] Double-clic sur un Poste Linux (terminal web) :
+    - Endpoint WebSocket FastAPI <-> docker exec (PTY)
+    - Terminal interactif xterm.js intégré dans le navigateur.
+[ ] Double-clic sur un Poste Graphique (bureau web à la demande) :
+    - Démarrage à la demande du conteneur graphique
+    - Proxy HTTP/WebSocket authentifié (JWT + contrôle d'accès infra) vers le
+      bureau web (noVNC / KasmVNC) dans un onglet dédié.
+
+--------------------------------------------------------------------------------
+HORS PÉRIMÈTRE V1 (ÉTAPES ULTÉRIEURES)
+--------------------------------------------------------------------------------
+- Bouton « Cloner » une infrastructure partagée vers son espace personnel.
+- Modules Windows / Active Directory (orchestration de VMs complètes).
+- Édition / suivi collaboratif en temps réel à plusieurs.
+- Assistant intelligent de génération d'infrastructures à la demande.
+================================================================================
