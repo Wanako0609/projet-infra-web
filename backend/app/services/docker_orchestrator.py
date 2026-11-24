@@ -577,5 +577,161 @@ class DockerOrchestrator:
             nodes=node_statuses,
         )
 
+    def _get_running_container(self, client: Any, infra_id: int, node_id: str) -> Any:
+        cname = container_name_for(infra_id, node_id)
+        try:
+            container = client.containers.get(cname)
+            container.reload()
+        except NotFound as exc:
+            raise OrchestratorError(
+                f"Le module '{node_id}' n'est pas démarré. Démarrez d'abord l'infrastructure ou ce module.",
+                status_code=400,
+            ) from exc
+
+        if container.status != "running":
+            raise OrchestratorError(
+                f"Le module '{node_id}' n'est pas en cours d'exécution (état : {container.status}).",
+                status_code=400,
+            )
+        return container
+
+    def exec_sql(
+        self,
+        infra_id: int,
+        definition: InfrastructureDefinition,
+        node_id: str,
+        query: str,
+    ) -> dict[str, Any]:
+        """
+        Exécute une requête SQL directement dans le conteneur PostgreSQL via `docker exec psql`
+        (sans jamais exposer le port 5432 sur l'hôte, ni passer par un shell).
+        """
+        node = next((n for n in definition.nodes if n.id == node_id), None)
+        if node is None:
+            raise OrchestratorError(f"Module '{node_id}' introuvable.", status_code=404)
+        if node.module_type != "postgres":
+            raise OrchestratorError("La console SQL est réservée aux modules PostgreSQL.", status_code=400)
+
+        spec = MODULE_CATALOG["postgres"]
+        cfg = {**spec["default_config"], **(node.config or {})}
+        db_name = str(cfg.get("db_name") or "app_db")
+        db_user = str(cfg.get("db_user") or "postgres")
+        db_password = str(cfg.get("db_password") or "password")
+
+        client = self._get_client()
+        container = self._get_running_container(client, infra_id, node_id)
+
+        try:
+            exit_code, output = container.exec_run(
+                cmd=["psql", "-v", "ON_ERROR_STOP=1", "-U", db_user, "-d", db_name, "-c", query],
+                environment={"PGPASSWORD": db_password},
+                demux=True,
+            )
+        except APIError as exc:
+            raise OrchestratorError(f"Erreur d'exécution SQL : {exc.explanation}", status_code=500) from exc
+
+        stdout_bytes, stderr_bytes = output if isinstance(output, tuple) else (output, b"")
+        return {
+            "exit_code": int(exit_code),
+            "stdout": (stdout_bytes or b"").decode("utf-8", errors="replace"),
+            "stderr": (stderr_bytes or b"").decode("utf-8", errors="replace"),
+        }
+
+    def list_sql_tables(
+        self,
+        infra_id: int,
+        definition: InfrastructureDefinition,
+        node_id: str,
+    ) -> list[str]:
+        """Liste les tables du schéma public d'un module PostgreSQL démarré."""
+        node = next((n for n in definition.nodes if n.id == node_id), None)
+        if node is None:
+            raise OrchestratorError(f"Module '{node_id}' introuvable.", status_code=404)
+        if node.module_type != "postgres":
+            raise OrchestratorError("Ce module n'est pas une base PostgreSQL.", status_code=400)
+
+        spec = MODULE_CATALOG["postgres"]
+        cfg = {**spec["default_config"], **(node.config or {})}
+        db_name = str(cfg.get("db_name") or "app_db")
+        db_user = str(cfg.get("db_user") or "postgres")
+        db_password = str(cfg.get("db_password") or "password")
+
+        client = self._get_client()
+        container = self._get_running_container(client, infra_id, node_id)
+        try:
+            exit_code, output = container.exec_run(
+                cmd=[
+                    "psql",
+                    "-t",
+                    "-A",
+                    "-U",
+                    db_user,
+                    "-d",
+                    db_name,
+                    "-c",
+                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;",
+                ],
+                environment={"PGPASSWORD": db_password},
+                demux=True,
+            )
+        except APIError as exc:
+            raise OrchestratorError(f"Impossible de lister les tables : {exc.explanation}", status_code=500) from exc
+
+        stdout_bytes, stderr_bytes = output if isinstance(output, tuple) else (output, b"")
+        if exit_code != 0:
+            err = (stderr_bytes or b"").decode("utf-8", errors="replace").strip()
+            raise OrchestratorError(
+                err or "PostgreSQL n'est peut-être pas encore prêt, réessayez dans quelques secondes.",
+                status_code=400,
+            )
+        raw = (stdout_bytes or b"").decode("utf-8", errors="replace")
+        return [line.strip() for line in raw.splitlines() if line.strip()]
+
+    def open_terminal_exec(
+        self,
+        infra_id: int,
+        definition: InfrastructureDefinition,
+        node_id: str,
+    ) -> tuple[Any, str, Any]:
+        """
+        Ouvre un shell interactif PTY (bash ou sh) dans un poste Linux démarré.
+        Retourne (client, exec_id, socket_docker).
+        """
+        node = next((n for n in definition.nodes if n.id == node_id), None)
+        if node is None:
+            raise OrchestratorError(f"Module '{node_id}' introuvable.", status_code=404)
+        if node.module_type not in ("linux_net", "linux_desktop"):
+            raise OrchestratorError("Le terminal web est disponible sur les postes Linux uniquement.", status_code=400)
+
+        client = self._get_client()
+        container = self._get_running_container(client, infra_id, node_id)
+
+        try:
+            created = client.api.exec_create(
+                container.id,
+                cmd=["/bin/sh", "-c", "if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi"],
+                stdin=True,
+                tty=True,
+                environment={"TERM": "xterm-256color"},
+            )
+            exec_id = created["Id"]
+            sock = client.api.exec_start(exec_id, tty=True, socket=True)
+            return client, exec_id, sock
+        except APIError as exc:
+            raise OrchestratorError(f"Impossible d'ouvrir le terminal : {exc.explanation}", status_code=500) from exc
+
+    def get_desktop_host_port(self, infra_id: int, node_id: str) -> int:
+        """Retourne le port local 127.0.0.1 attribué au serveur KasmVNC (port interne 3000)."""
+        client = self._get_client()
+        container = self._get_running_container(client, infra_id, node_id)
+        web_port = MODULE_CATALOG["linux_desktop"]["web_port"]
+        host_port = _extract_host_port(container, web_port)
+        if not host_port:
+            raise OrchestratorError(
+                f"Aucun port bureau exposé pour le module '{node_id}'.",
+                status_code=500,
+            )
+        return host_port
+
 
 orchestrator = DockerOrchestrator()

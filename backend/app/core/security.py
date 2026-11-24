@@ -41,9 +41,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def decode_user_from_token(token: str, db: Session) -> User:
     """
-    Décode le token JWT et récupère l'utilisateur correspondant en base de données.
+    Valide un token JWT d'accès et retourne l'utilisateur correspondant en base.
+    Réutilisé par les routes HTTP (via get_current_user) et par les WebSockets.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,6 +54,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("purpose") is not None:
+            # Un token scopé (ex. bureau) ne peut pas servir de token d'accès général
+            raise credentials_exception
         username: str | None = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -75,3 +79,54 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         )
 
     return user
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    return decode_user_from_token(token, db)
+
+
+def create_desktop_token(
+    username: str,
+    infra_id: int,
+    node_id: str,
+    expires_minutes: int = 120,
+) -> str:
+    """
+    Crée un JWT scopé uniquement à l'accès proxy KasmVNC d'un module précis.
+    """
+    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    payload = {
+        "sub": username,
+        "purpose": "desktop_proxy",
+        "infra_id": infra_id,
+        "node_id": node_id,
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def verify_desktop_token(token: str, expected_infra_id: int, expected_node_id: str) -> str:
+    """
+    Vérifie qu'un token de session bureau est valide et correspond bien à (infra_id, node_id).
+    Retourne le username en cas de succès, ou lève 401.
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session bureau invalide ou expirée.",
+        ) from exc
+
+    if (
+        payload.get("purpose") != "desktop_proxy"
+        or payload.get("infra_id") != expected_infra_id
+        or payload.get("node_id") != expected_node_id
+        or not payload.get("sub")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token de session non autorisé pour ce module.",
+        )
+
+    return str(payload["sub"])

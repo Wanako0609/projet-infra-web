@@ -6,6 +6,7 @@
     <title>Atelier visuel - Infra Web</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/editor.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 </head>
 <body class="editor-body">
     <header class="editor-topbar">
@@ -58,6 +59,7 @@
                     <li><strong>Relier</strong> : tirer depuis le point bleu d'un module vers un autre</li>
                     <li><strong>Supprimer un lien</strong> : cliquer sur la croix au milieu du câble</li>
                     <li><strong>Configurer</strong> : cliquer sur un module</li>
+                    <li><strong>Interagir</strong> : double-clic (SQL, Terminal ou Bureau)</li>
                 </ul>
             </div>
         </aside>
@@ -155,6 +157,61 @@
         </aside>
     </div>
 
+    <!-- Modale Console SQL (double-clic sur PostgreSQL) -->
+    <div id="sql-modal" class="modal-backdrop" hidden>
+        <div class="modal-dialog modal-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 id="sql-modal-title">Console SQL</h3>
+                    <span id="sql-modal-subtitle" class="muted"></span>
+                </div>
+                <button type="button" class="btn-secondary" onclick="closeSqlModal()">Fermer</button>
+            </div>
+            <div class="sql-tables-section">
+                <div class="sql-tables-top">
+                    <strong>Tables (schéma public) :</strong>
+                    <button type="button" class="btn-secondary btn-sm" onclick="refreshSqlTables()">Rafraîchir</button>
+                </div>
+                <div id="sql-tables-bar" class="sql-tables-bar"></div>
+            </div>
+            <div class="form-group">
+                <label for="sql-query-input">Requête SQL (<code>Ctrl+Entrée</code> pour exécuter)</label>
+                <textarea id="sql-query-input" rows="5" placeholder="SELECT * FROM clients;"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-primary btn-inline" onclick="handleRunSql()">Exécuter SQL</button>
+                <button type="button" class="btn-secondary" onclick="insertCreateTableTemplate()">Exemple CREATE TABLE</button>
+            </div>
+            <pre id="sql-output" class="sql-output">Prêt. Sélectionnez une table ou saisissez une requête SQL.</pre>
+        </div>
+    </div>
+
+    <!-- Modale Terminal Web (double-clic sur Poste Linux) -->
+    <div id="terminal-modal" class="modal-backdrop" hidden>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-header">
+                <div class="terminal-title-row">
+                    <h3 id="terminal-modal-title">Terminal Linux</h3>
+                    <span id="terminal-status-badge" class="badge badge-status">Déconnecté</span>
+                </div>
+                <div class="modal-header-actions">
+                    <button type="button" class="btn-secondary btn-sm" onclick="reconnectTerminal()">Reconnecter</button>
+                    <button type="button" class="btn-danger btn-sm" onclick="closeTerminalModal()">Fermer</button>
+                </div>
+            </div>
+            <div id="terminal-container" class="terminal-container"></div>
+            <div id="terminal-fallback" class="terminal-fallback" hidden>
+                <pre id="terminal-fallback-output" class="terminal-fallback-output"></pre>
+                <form class="terminal-fallback-form" onsubmit="handleFallbackTerminalSend(event)">
+                    <input type="text" id="terminal-fallback-input" placeholder="Tapez une commande (ex: ip a, ping -c 2 db-1)..." autocomplete="off">
+                    <button type="submit" class="btn-primary btn-inline">Envoyer</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
     <script src="../js/editor.js"></script>

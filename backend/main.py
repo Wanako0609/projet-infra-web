@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, infrastructures, modules, users
+from app.api import auth, desktop_proxy, infrastructures, interactive, modules, users
 from app.models import infrastructure, user  # noqa: F401 - enregistre les tables dans Base.metadata
 from app.services.db import Base, engine
 
@@ -23,6 +23,8 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(modules.router, prefix="/api/modules", tags=["modules"])
 app.include_router(infrastructures.router, prefix="/api/infrastructures", tags=["infrastructures"])
+app.include_router(interactive.router, prefix="/api/infrastructures", tags=["interactive"])
+app.include_router(desktop_proxy.router, prefix="/api/desktop", tags=["desktop-proxy"])
 
 
 @app.get("/")

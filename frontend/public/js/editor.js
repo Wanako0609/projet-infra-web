@@ -364,16 +364,13 @@ function renderCanvas() {
             };
         });
 
-        // Double-clic : prêt pour l'Étape 5 (terminal web / explorateur SQL / bureau KasmVNC)
+        // Double-clic : ouvre l'interaction directe (Console SQL / Terminal web / Bureau KasmVNC)
         nodeEl.addEventListener('dblclick', (event) => {
             event.stopPropagation();
             editorState.selectedNodeId = nodeId;
             highlightSelectedNode();
             renderInspector();
-            showToast(
-                `Module « ${nodeId} » ouvert dans l'inspecteur (l'accès interactif direct par double-clic arrive à l'Étape 5).`,
-                'info'
-            );
+            openNodeInteractive(nodeId);
         });
 
         // Poignée pour tirer un lien réseau
@@ -442,9 +439,22 @@ function renderInspector() {
 
     const controlsEl = document.getElementById('insp-node-controls');
     if (!editorState.isReadOnly && editorState.runtime?.status === 'running') {
-        controlsEl.innerHTML = isRunning
-            ? `<button type="button" class="btn-warn btn-sm" onclick="handleStopNode('${escapeHtml(node.id)}')">Arrêter ce module</button>`
+        const startStopBtn = isRunning
+            ? `<button type="button" class="btn-warn btn-sm" onclick="handleStopNode('${escapeHtml(node.id)}')">Arrêter</button>`
             : `<button type="button" class="btn-success btn-sm" onclick="handleStartNode('${escapeHtml(node.id)}')">Démarrer${spec?.on_demand ? ' (à la demande)' : ''}</button>`;
+
+        let openBtn = '';
+        if (node.module_type === 'postgres' && isRunning) {
+            openBtn = `<button type="button" class="btn-primary btn-inline btn-sm" onclick="openNodeInteractive('${escapeHtml(node.id)}')">Console SQL</button>`;
+        } else if (node.module_type === 'linux_net' && isRunning) {
+            openBtn = `<button type="button" class="btn-primary btn-inline btn-sm" onclick="openNodeInteractive('${escapeHtml(node.id)}')">Terminal web</button>`;
+        } else if (node.module_type === 'linux_desktop') {
+            openBtn = `<button type="button" class="btn-primary btn-inline btn-sm" onclick="openNodeInteractive('${escapeHtml(node.id)}')">Ouvrir Bureau</button>`;
+            if (isRunning) {
+                openBtn += ` <button type="button" class="btn-secondary btn-sm" onclick="openTerminalModal('${escapeHtml(node.id)}')">Terminal</button>`;
+            }
+        }
+        controlsEl.innerHTML = `${openBtn} ${startStopBtn}`;
     } else {
         controlsEl.innerHTML = '';
     }
@@ -789,6 +799,349 @@ async function handleExport() {
     }
 }
 
+// --- Accès interactif au double-clic (Étape 5 : SQL, Terminal WebSocket, Bureau KasmVNC) ---
+
+const interactiveState = {
+    sqlNodeId: null,
+    termNodeId: null,
+    ws: null,
+    xterm: null,
+    fitAddon: null,
+    resizeHandler: null,
+};
+
+function getWsBaseUrl() {
+    return API_BASE_URL.replace(/^http/, 'ws');
+}
+
+function openNodeInteractive(nodeId) {
+    if (editorState.isReadOnly) {
+        showToast("L'accès interactif direct aux machines est réservé au propriétaire (mode lecture seule).", 'info');
+        return;
+    }
+
+    const node = editorState.infra.definition.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+
+    const rt = editorState.runtime;
+    if (!rt || rt.status !== 'running') {
+        showToast("Démarrez d'abord l'infrastructure avant d'ouvrir un module.", 'error');
+        return;
+    }
+
+    const rtNode = getRuntimeNode(nodeId);
+    if (node.module_type === 'postgres') {
+        if (!rtNode || rtNode.state !== 'running') {
+            showToast(`Le module « ${nodeId} » est arrêté. Démarrez-le d'abord.`, 'error');
+            return;
+        }
+        openSqlModal(node);
+    } else if (node.module_type === 'linux_net') {
+        if (!rtNode || rtNode.state !== 'running') {
+            showToast(`Le module « ${nodeId} » est arrêté. Démarrez-le d'abord.`, 'error');
+            return;
+        }
+        openTerminalModal(nodeId);
+    } else if (node.module_type === 'linux_desktop') {
+        openDesktopSession(node);
+    }
+}
+
+// --- 1. Console SQL PostgreSQL ---
+
+async function openSqlModal(node) {
+    interactiveState.sqlNodeId = node.id;
+    document.getElementById('sql-modal-title').textContent = `Console SQL — ${node.name} (${node.id})`;
+    const dbName = node.config?.db_name || 'app_db';
+    const dbUser = node.config?.db_user || 'postgres';
+    document.getElementById('sql-modal-subtitle').textContent = `Base : ${dbName} • Utilisateur : ${dbUser}`;
+    document.getElementById('sql-output').className = 'sql-output';
+    document.getElementById('sql-output').textContent = 'Chargement des tables...';
+    document.getElementById('sql-modal').hidden = false;
+    await refreshSqlTables();
+}
+
+function closeSqlModal() {
+    interactiveState.sqlNodeId = null;
+    document.getElementById('sql-modal').hidden = true;
+}
+
+async function refreshSqlTables() {
+    const nodeId = interactiveState.sqlNodeId;
+    if (!nodeId) return;
+    const bar = document.getElementById('sql-tables-bar');
+    bar.innerHTML = '<span class="muted">Chargement...</span>';
+
+    try {
+        const data = await apiFetch(
+            `/infrastructures/${editorState.infraId}/nodes/${nodeId}/sql/tables`,
+            { method: 'GET' }
+        );
+        const tables = data.tables || [];
+        if (tables.length === 0) {
+            bar.innerHTML = '<span class="muted">Aucune table dans le schéma public. Créez-en une ci-dessous !</span>';
+        } else {
+            bar.innerHTML = tables
+                .map(
+                    (tbl) =>
+                        `<button type="button" class="table-chip" onclick="selectSqlTable('${escapeHtml(tbl)}')">${escapeHtml(tbl)}</button>`
+                )
+                .join('');
+        }
+        document.getElementById('sql-output').textContent =
+            tables.length > 0
+                ? `${tables.length} table(s) détectée(s). Cliquez sur une table ou exécutez votre requête SQL.`
+                : 'Base prête (aucune table pour le moment).';
+    } catch (error) {
+        bar.innerHTML = '';
+        const out = document.getElementById('sql-output');
+        out.className = 'sql-output error';
+        out.textContent = error.message;
+    }
+}
+
+function selectSqlTable(tableName) {
+    const input = document.getElementById('sql-query-input');
+    input.value = `SELECT * FROM "${tableName}" LIMIT 50;`;
+    handleRunSql();
+}
+
+function insertCreateTableTemplate() {
+    const input = document.getElementById('sql-query-input');
+    input.value =
+        "CREATE TABLE IF NOT EXISTS demo (\n  id SERIAL PRIMARY KEY,\n  nom TEXT NOT NULL\n);\nINSERT INTO demo (nom) VALUES ('Test');\nSELECT * FROM demo;";
+    input.focus();
+}
+
+async function handleRunSql() {
+    const nodeId = interactiveState.sqlNodeId;
+    if (!nodeId) return;
+    const query = document.getElementById('sql-query-input').value.trim();
+    if (!query) return;
+
+    const out = document.getElementById('sql-output');
+    out.className = 'sql-output';
+    out.textContent = 'Exécution en cours...';
+
+    try {
+        const res = await apiFetch(`/infrastructures/${editorState.infraId}/nodes/${nodeId}/sql`, {
+            method: 'POST',
+            body: JSON.stringify({ query }),
+        });
+        if (res.exit_code !== 0) {
+            out.className = 'sql-output error';
+            out.textContent = res.stderr || res.stdout || `Erreur SQL (code ${res.exit_code})`;
+        } else {
+            out.className = 'sql-output';
+            out.textContent = res.stdout || res.stderr || 'Requête exécutée avec succès.';
+            if (/\b(create|drop|alter)\b/i.test(query)) {
+                refreshSqlTables();
+            }
+        }
+    } catch (error) {
+        out.className = 'sql-output error';
+        out.textContent = error.message;
+    }
+}
+
+// --- 2. Terminal Web interactif (WebSocket + xterm.js avec fallback offline) ---
+
+function setTerminalBadge(text, running = false) {
+    const badge = document.getElementById('terminal-status-badge');
+    badge.textContent = text;
+    badge.className = `badge ${running ? 'badge-running' : 'badge-status'}`;
+}
+
+function openTerminalModal(nodeId) {
+    closeTerminalConnection();
+    interactiveState.termNodeId = nodeId;
+    const node = editorState.infra.definition.nodes.find((n) => n.id === nodeId);
+    document.getElementById('terminal-modal-title').textContent =
+        `Terminal Linux — ${node ? node.name : nodeId} (${nodeId})`;
+    document.getElementById('terminal-modal').hidden = false;
+    connectTerminalWebSocket(nodeId);
+}
+
+function closeTerminalConnection() {
+    if (interactiveState.resizeHandler) {
+        window.removeEventListener('resize', interactiveState.resizeHandler);
+        interactiveState.resizeHandler = null;
+    }
+    if (interactiveState.ws) {
+        try {
+            interactiveState.ws.close();
+        } catch (_) {}
+        interactiveState.ws = null;
+    }
+    if (interactiveState.xterm) {
+        try {
+            interactiveState.xterm.dispose();
+        } catch (_) {}
+        interactiveState.xterm = null;
+        interactiveState.fitAddon = null;
+    }
+}
+
+function closeTerminalModal() {
+    closeTerminalConnection();
+    interactiveState.termNodeId = null;
+    document.getElementById('terminal-modal').hidden = true;
+}
+
+function reconnectTerminal() {
+    if (!interactiveState.termNodeId) return;
+    closeTerminalConnection();
+    connectTerminalWebSocket(interactiveState.termNodeId);
+}
+
+function connectTerminalWebSocket(nodeId) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        showToast('Session expirée, veuillez vous reconnecter.', 'error');
+        return;
+    }
+
+    const container = document.getElementById('terminal-container');
+    const fallback = document.getElementById('terminal-fallback');
+    const fallbackOut = document.getElementById('terminal-fallback-output');
+    container.innerHTML = '';
+
+    const hasXterm = typeof window.Terminal === 'function';
+    container.hidden = !hasXterm;
+    fallback.hidden = hasXterm;
+
+    if (hasXterm) {
+        const term = new window.Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            theme: { background: '#0f172a', foreground: '#e2e8f0' },
+        });
+        let fitAddon = null;
+        if (window.FitAddon && typeof window.FitAddon.FitAddon === 'function') {
+            fitAddon = new window.FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+        }
+        term.open(container);
+        if (fitAddon) {
+            fitAddon.fit();
+        }
+        term.focus();
+        interactiveState.xterm = term;
+        interactiveState.fitAddon = fitAddon;
+    } else {
+        fallbackOut.textContent = 'Mode terminal de secours (xterm.js hors ligne)\n';
+    }
+
+    setTerminalBadge('Connexion...', false);
+    const wsUrl = `${getWsBaseUrl()}/infrastructures/${editorState.infraId}/nodes/${encodeURIComponent(nodeId)}/terminal?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsUrl);
+    interactiveState.ws = ws;
+
+    const sendResize = () => {
+        if (!interactiveState.xterm || ws.readyState !== WebSocket.OPEN) return;
+        if (interactiveState.fitAddon) {
+            interactiveState.fitAddon.fit();
+        }
+        ws.send(
+            `\x00RESIZE:${JSON.stringify({
+                cols: interactiveState.xterm.cols,
+                rows: interactiveState.xterm.rows,
+            })}`
+        );
+    };
+
+    ws.onopen = () => {
+        setTerminalBadge('Connecté', true);
+        if (interactiveState.xterm) {
+            sendResize();
+            interactiveState.xterm.onData((data) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(data);
+                }
+            });
+            interactiveState.resizeHandler = sendResize;
+            window.addEventListener('resize', sendResize);
+        }
+    };
+
+    ws.onmessage = (event) => {
+        if (interactiveState.xterm) {
+            interactiveState.xterm.write(event.data);
+        } else {
+            fallbackOut.textContent += event.data;
+            fallbackOut.scrollTop = fallbackOut.scrollHeight;
+        }
+    };
+
+    ws.onclose = (event) => {
+        setTerminalBadge('Déconnecté', false);
+        const reason = event.reason ? ` (${event.reason})` : '';
+        if (interactiveState.xterm) {
+            interactiveState.xterm.writeln(`\r\n\x1b[33m[Connexion fermée${reason}]\x1b[0m`);
+        } else {
+            fallbackOut.textContent += `\n[Connexion fermée${reason}]\n`;
+        }
+    };
+
+    ws.onerror = () => {
+        setTerminalBadge('Erreur', false);
+    };
+}
+
+function handleFallbackTerminalSend(event) {
+    event.preventDefault();
+    const input = document.getElementById('terminal-fallback-input');
+    if (interactiveState.ws && interactiveState.ws.readyState === WebSocket.OPEN) {
+        interactiveState.ws.send(`${input.value}\n`);
+    }
+    input.value = '';
+}
+
+// --- 3. Bureau Graphique KasmVNC à la demande (proxy authentifié par cookie HttpOnly) ---
+
+async function openDesktopSession(node) {
+    // Ouvre un onglet synchrone avant l'appel async pour éviter le bloqueur de popups
+    const popup = window.open('about:blank', '_blank');
+    if (popup) {
+        popup.document.write(
+            '<p style="font-family:sans-serif;padding:2rem;">Démarrage du bureau graphique KasmVNC (Wireshark) en cours...</p>'
+        );
+    }
+
+    showToast(`Préparation du bureau graphique « ${node.id} »...`, 'info');
+    try {
+        const session = await apiFetch(
+            `/infrastructures/${editorState.infraId}/nodes/${node.id}/desktop-session`,
+            { method: 'POST' }
+        );
+        await refreshRuntimeStatus();
+
+        const openTarget = () => {
+            if (popup && !popup.closed) {
+                popup.location.href = session.url;
+            } else {
+                window.open(session.url, '_blank');
+            }
+        };
+
+        if (session.started_on_demand) {
+            showToast(
+                `Bureau « ${node.id} » démarré à la demande ! Ouverture de KasmVNC dans 3 secondes...`,
+                'success'
+            );
+            setTimeout(openTarget, 3000);
+        } else {
+            openTarget();
+            showToast(`Bureau graphique « ${node.id} » ouvert dans un nouvel onglet.`, 'success');
+        }
+    } catch (error) {
+        if (popup && !popup.closed) {
+            popup.close();
+        }
+        showToast(error.message, 'error');
+    }
+}
+
 // --- Initialisation ---
 
 window.addEventListener('beforeunload', (event) => {
@@ -813,6 +1166,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     bindInspectorInputs();
     bindCanvasEvents();
+
+    // Raccourci Ctrl+Entrée dans la console SQL
+    document.getElementById('sql-query-input').addEventListener('keydown', (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            handleRunSql();
+        }
+    });
 
     try {
         const [modules, infra, runtime] = await Promise.all([
