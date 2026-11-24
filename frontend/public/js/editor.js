@@ -803,7 +803,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (!user) return;
 
     const params = new URLSearchParams(window.location.search);
-    const idParam = Number(params.get('id'));
+    const hashId = window.location.hash.replace(/^#/, '').trim();
+    const idParam = Number(params.get('id') || hashId);
     if (!idParam || Number.isNaN(idParam)) {
         window.location.href = 'dashboard.html';
         return;

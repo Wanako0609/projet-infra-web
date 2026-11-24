@@ -28,7 +28,7 @@ projet-infra-web/
 
 ### 1. Base de données (PostgreSQL)
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### 2. Back-end (FastAPI)
