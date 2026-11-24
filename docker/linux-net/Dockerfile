@@ -1,23 +1,26 @@
-# Image vérifiée : poste Linux complet (outils réseau, système, Python et client PostgreSQL)
-FROM alpine:3.20
+# Image vérifiée : poste Linux Debian avec apt, outils réseau, système, Python et client PostgreSQL
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
       bash \
       sudo \
-      shadow \
       iproute2 \
-      iputils \
+      iputils-ping \
       iptables \
       tcpdump \
       curl \
       wget \
-      bind-tools \
+      dnsutils \
       netcat-openbsd \
       openssh-client \
-      postgresql16-client \
+      postgresql-client \
       python3 \
       nano \
-      vim
+      vim \
+      ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /workspace
 WORKDIR /workspace
