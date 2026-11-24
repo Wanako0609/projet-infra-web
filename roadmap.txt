@@ -51,41 +51,61 @@ Réalisé :
     - Chemins de redirection sécurisés entre la racine et /pages/.
 
 --------------------------------------------------------------------------------
-ÉTAPE 1 : MODÈLE DE DONNÉES, CATALOGUE DE MODULES & PARTAGE            [À FAIRE]
+ÉTAPE 1 : MODÈLE DE DONNÉES, CATALOGUE DE MODULES & PARTAGE           [TERMINÉE]
 --------------------------------------------------------------------------------
 Objectif : Persister les infrastructures en base, définir les briques autorisées
 et gérer les droits (propriétaire vs partage en lecture seule).
 
-À faire :
-[ ] Définir le catalogue de modules vérifiés côté back-end (GET /api/modules) :
-    - Léger     : Base SQL (ex. PostgreSQL ~150 Mo)
-    - Réseau    : Poste Linux minimal avec outils réseau (~200 Mo)
-    - Graphique : Poste Linux avec bureau web à la demande (~800 Mo)
-    (avec images autorisées, ports/services, limites RAM/CPU).
-[ ] Créer les tables SQLAlchemy :
-    - infrastructures (id, name, description, owner_id, definition JSONB,
+Réalisé :
+[x] Catalogue de modules vérifiés côté back-end (app/core/catalog.py,
+    GET /api/modules) :
+    - postgres      (Léger ~150 Mo)   : base PostgreSQL + init.sql
+    - linux_net     (Réseau ~200 Mo)  : poste Linux minimal + /workspace
+    - linux_desktop (Graphique ~800 Mo, à la demande) : bureau web + /workspace
+[x] Tables SQLAlchemy (app/models/infrastructure.py) :
+    - infrastructures (id, name, description, owner_id, definition JSON,
       status, created_at, updated_at)
-    - infrastructure_shares (infra_id, user_id, permission='read_only')
-[ ] Créer les routes API REST (/api/infrastructures) :
-    - Lister mes infrastructures + celles partagées avec moi
-    - Créer / consulter / modifier / supprimer (vérification stricte des droits)
-    - Partager / retirer le partage avec un autre utilisateur (lecture seule)
-[ ] Afficher les deux espaces sur le dashboard :
-    - « Mes infrastructures » (édition / déploiement / partage)
-    - « Partagées avec moi » (consultation en lecture seule)
+    - infrastructure_shares (infrastructure_id, user_id, permission='read_only',
+      contrainte d'unicité par paire infra/user)
+[x] Validation Pydantic stricte (app/schemas/infrastructure.py) :
+    - Liste blanche des module_type du catalogue, intégrité du graphe
+      (unicité des IDs, liens vers des nœuds existants), protection contre
+      le path traversal dans le champ files.
+[x] Routes API REST (app/api/infrastructures.py) :
+    - GET /api/infrastructures (espaces owned et shared séparés)
+    - POST / GET / PUT / DELETE /api/infrastructures/{id} (403 si non-propriétaire
+      sur les actions d'écriture)
+    - POST / DELETE /api/infrastructures/{id}/shares (partage lecture seule)
+[x] Dashboard front-end mis à jour (pages/dashboard.html + js/dashboard.js) :
+    - Catalogue de modules, création d'infra (avec exemple pré-rempli),
+      espaces « Mes infrastructures » et « Partagées avec moi », gestion des
+      partages et aperçu JSON de la topologie.
 
 --------------------------------------------------------------------------------
-ÉTAPE 2 : FORMAT DE FICHIER DÉDIÉ (EXPORT & IMPORT)                    [À FAIRE]
+ÉTAPE 2 : FORMAT DE FICHIER DÉDIÉ (EXPORT & IMPORT .ZIP)               [À FAIRE]
 --------------------------------------------------------------------------------
 Objectif : Permettre la sauvegarde portable et le partage hors-ligne d'une
-infrastructure via un fichier validé.
+infrastructure via une archive .zip déclarative (zéro script exécuté à l'import).
+
+Principe & limite assumée en V1 :
+- L'OS et les outils proviennent toujours des images vérifiées du catalogue.
+- Seuls la topologie (infra.json), les paramètres structurés (config) et les
+  fichiers dédiés (init.sql pour PostgreSQL, dossier /workspace pour les postes
+  Linux) sont embarqués dans l'archive .zip.
+- Les installations manuelles hors /workspace (ex. apt install à la volée dans
+  un conteneur) ne sont pas incluses dans l'export en V1.
 
 À faire :
-[ ] Formaliser un schéma Pydantic versionné (ex. schema_version: "1.0",
-    métadonnées, liste des modules + positions + configs, liens réseau).
-[ ] Endpoint GET /api/infrastructures/{id}/export (téléchargement du fichier).
-[ ] Endpoint POST /api/infrastructures/import (validation stricte contre le
-    catalogue de modules + création dans l'espace personnel).
+[ ] Générer un bundle .zip déclaratif à l'export (GET /api/infrastructures/{id}/export) :
+    - infra.json (topologie + paramètres validés)
+    - configs/<node_id>/... (init.sql, fichiers workspace/...)
+    - docker-compose.yml généré côté serveur (bonus pour lancement local hors
+      plateforme, systématiquement ignoré à l'import)
+[ ] Endpoint POST /api/infrastructures/import :
+    - Lecture stricte de infra.json + configs/ uniquement (ignore tout script
+      ou docker-compose.yml)
+    - Validation Pydantic contre le catalogue + protection anti-Zip Slip et
+      limites de taille (anti zip-bomb)
 [ ] Boutons Exporter / Importer sur l'interface web.
 
 --------------------------------------------------------------------------------

@@ -17,25 +17,65 @@
     </header>
 
     <main>
-        <h2>Tableau de bord</h2>
-        <p id="welcome-text">Chargement de votre espace de travail...</p>
+        <section class="dashboard-intro">
+            <h2>Tableau de bord</h2>
+            <p id="welcome-text">Chargement de votre espace de travail...</p>
+            <p id="dashboard-message" class="form-message" hidden></p>
+        </section>
 
-        <div id="infra-workspace" class="workspace-placeholder">
-            <p><em>Interface visuelle « plug &amp; play » à venir (Étapes 1 à 4)...</em></p>
+        <section class="dashboard-section">
+            <h3>Catalogue de modules vérifiés (V1)</h3>
+            <div id="module-catalog-list" class="card-grid"></div>
+        </section>
+
+        <section class="dashboard-section">
+            <h3>Nouvelle infrastructure</h3>
+            <form id="create-infra-form" class="card create-form" onsubmit="handleCreateInfrastructure(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="infra-name">Nom de l'infrastructure</label>
+                        <input type="text" id="infra-name" required maxlength="120" placeholder="Ex : TP Réseau + PostgreSQL">
+                    </div>
+                    <div class="form-group">
+                        <label for="infra-description">Description (optionnelle)</label>
+                        <input type="text" id="infra-description" maxlength="2000" placeholder="Ex : Labo de démonstration NSY115">
+                    </div>
+                </div>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="infra-with-sample" checked>
+                    Pré-remplir avec un exemple (1 base PostgreSQL + 1 poste Linux reliés)
+                </label>
+                <button type="submit" class="btn-primary btn-inline">Créer l'infrastructure</button>
+            </form>
+        </section>
+
+        <div class="spaces-grid">
+            <section class="dashboard-section">
+                <h3>Mes infrastructures</h3>
+                <div id="owned-infras-list" class="stack-list"></div>
+            </section>
+
+            <section class="dashboard-section">
+                <h3>Partagées avec moi</h3>
+                <div id="shared-infras-list" class="stack-list"></div>
+            </section>
         </div>
+
+        <section id="infra-detail-panel" class="card detail-panel" hidden>
+            <div class="card-header">
+                <div>
+                    <h3 id="detail-title"></h3>
+                    <span id="detail-access-badge" class="badge"></span>
+                </div>
+                <button type="button" class="btn-secondary" onclick="closeDetailPanel()">Fermer</button>
+            </div>
+            <p class="muted">Aperçu de la définition JSON (le canevas visuel glisser-déposer arrive à l'Étape 4) :</p>
+            <pre id="detail-json" class="json-preview"></pre>
+        </section>
     </main>
 
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
-    <script>
-        window.addEventListener('DOMContentLoaded', async () => {
-            const user = await requireAuth();
-            if (!user) return;
-
-            document.getElementById('user-badge').textContent = `${user.username} (${user.email})`;
-            document.getElementById('welcome-text').textContent =
-                `Bienvenue ${user.username} ! Vous pourrez ici créer, sauvegarder et partager vos infrastructures virtuelles.`;
-        });
-    </script>
+    <script src="../js/dashboard.js"></script>
 </body>
 </html>

@@ -1,5 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy.orm import relationship
+
 from app.services.db import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -10,3 +13,14 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+
+    infrastructures = relationship(
+        "Infrastructure",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    shared_infrastructures = relationship(
+        "InfrastructureShare",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
