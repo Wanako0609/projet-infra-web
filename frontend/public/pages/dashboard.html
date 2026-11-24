@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord - Infra Web</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Plateforme d'Infrastructures Virtuelles</h1>
+        <nav>
+            <a href="../index.html">Accueil</a>
+            <button onclick="logout()" style="margin-left: 1rem; cursor: pointer; padding: 0.5rem 1rem; background: #dc2626; color: white; border: none; border-radius: 4px;">Déconnexion</button>
+        </nav>
+    </header>
+    
+    <main>
+        <h2>Tableau de bord</h2>
+        <p>Bienvenue dans votre espace de travail. Vous pouvez ici créer, sauvegarder et partager vos infrastructures virtuelles.</p>
+        
+        <div id="infra-workspace" style="margin-top: 2rem; padding: 2rem; background: #fff; border: 2px dashed #cbd5e1; text-align: center;">
+            <p><em>Interface visuelle « plug & play » à venir...</em></p>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        window.onload = () => {
+            if (!isAuthenticated()) {
+                alert("Vous devez être connecté pour accéder au tableau de bord.");
+                window.location.href = 'login.html';
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "projet-infra-web-frontend",
+  "version": "1.0.0",
+  "description": "Interface web de la plateforme d'infrastructures virtuelles",
+  "scripts": {
+    "start": "npx serve public"
+  },
+  "dependencies": {}
+}

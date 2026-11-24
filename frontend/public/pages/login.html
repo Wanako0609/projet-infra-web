@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Infra Web</title>
+    <!-- On remonte d'un dossier (../) pour chercher css/ -->
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Plateforme d'Infrastructures Virtuelles</h1>
+        <nav>
+            <a href="../index.html">Accueil</a>
+        </nav>
+    </header>
+    
+    <main>
+        <h2>Connexion</h2>
+        <form id="login-form" onsubmit="handleLogin(event)">
+            <div style="margin-bottom: 1rem;">
+                <label for="username">Nom d'utilisateur :</label><br>
+                <input type="text" id="username" required>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label for="password">Mot de passe :</label><br>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Se connecter</button>
+        </form>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            loginUser(user, pass);
+        }
+    </script>
+</body>
+</html>
