@@ -121,10 +121,10 @@ isolés qui communiquent entre eux.
 Réalisé :
 [x] Images vérifiées & build (docker/) :
     - postgres:15-alpine (image officielle)
-    - docker/linux-net/Dockerfile (Alpine + iproute2, iputils, tcpdump, curl,
-      bind-tools, netcat-openbsd, postgresql16-client, bash, nano)
-    - docker/linux-desktop/Dockerfile (lscr.io/linuxserver/wireshark:latest +
-      outils réseau/psql, KasmVNC sur :3000 à la demande)
+    - docker/linux-net/Dockerfile (Alpine + bash, sudo, iproute2, iptables,
+      tcpdump, curl, openssh-client, postgresql16-client, python3, nano/vim)
+    - docker/linux-desktop/Dockerfile (lscr.io/linuxserver/webtop:alpine-xfce +
+      Wireshark, sudo, outils réseau/psql/python3, KasmVNC sur :3000 à la demande)
     - docker/build-images.sh pour préparer toutes les images en une commande
 [x] Orchestrateur Docker (backend/app/services/docker_orchestrator.py) :
     - Isolation réseau bridge L2 par infrastructure (infra_<id>_net) avec

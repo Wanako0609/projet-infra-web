@@ -39,7 +39,7 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "label": "Poste Linux Réseau",
         "category": "reseau",
         "category_label": "Réseau",
-        "description": "Poste Linux minimal équipé des outils réseau (iproute2, ping, curl, tcpdump, psql).",
+        "description": "Poste Linux (terminal) avec outils réseau, admin système, Python et client PostgreSQL.",
         "docker_image": "infra-web/linux-net:v1",
         "memory_mb": 200,
         "memory_limit": "256m",
@@ -47,8 +47,8 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "pids_limit": 128,
         "on_demand": False,
         "workspace_path": "/workspace",
-        # NET_ADMIN (ip addr / ip route) + NET_RAW (ping / tcpdump) dans le réseau isolé
-        "cap_drop": ["ALL"],
+        # Capabilities standard Docker (non-privilégié) + NET_ADMIN / NET_RAW pour les TP réseau et admin
+        "cap_drop": [],
         "cap_add": ["NET_ADMIN", "NET_RAW"],
         "shm_size": None,
         "seccomp_unconfined": False,
@@ -64,7 +64,7 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "label": "Poste Linux Graphique",
         "category": "graphique",
         "category_label": "Graphique (à la demande)",
-        "description": "Poste Linux avec bureau web KasmVNC et Wireshark (démarré uniquement à la demande).",
+        "description": "Bureau Linux XFCE complet dans le navigateur (KasmVNC, Wireshark, terminal, outils réseau).",
         "docker_image": "infra-web/linux-desktop:v1",
         "memory_mb": 800,
         "memory_limit": "1024m",
