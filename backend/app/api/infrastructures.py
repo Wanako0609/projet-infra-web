@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.security import get_current_user
@@ -14,6 +14,12 @@ from app.schemas.infrastructure import (
     ShareOut,
 )
 from app.services.db import get_db
+from app.services.infra_archive import (
+    ArchiveError,
+    MAX_ZIP_UPLOAD_BYTES,
+    build_infra_zip,
+    parse_infra_zip,
+)
 
 router = APIRouter()
 
@@ -150,6 +156,70 @@ def create_infrastructure(
     # Recharge avec les relations (owner, shares)
     infra = _get_infra_or_404(db, infra.id)
     return _serialize_infrastructure(infra, current_user)
+
+
+@router.post("/import", response_model=InfrastructureOut, status_code=status.HTTP_201_CREATED)
+async def import_infrastructure(
+    file: UploadFile = File(...),
+    name: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Importe une infrastructure depuis une archive .zip déclarative (infra.json + configs/)
+    et la crée dans l'espace personnel de l'utilisateur connecté.
+    """
+    # Lecture plafonnée pour rejeter rapidement un upload trop gros
+    raw_bytes = await file.read(MAX_ZIP_UPLOAD_BYTES + 1)
+    try:
+        manifest = parse_infra_zip(raw_bytes)
+    except ArchiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    infra_name = name.strip() if name and name.strip() else manifest.name
+    if len(infra_name) > 120:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le nom de l'infrastructure ne doit pas dépasser 120 caractères.",
+        )
+
+    infra = Infrastructure(
+        name=infra_name,
+        description=manifest.description,
+        owner_id=current_user.id,
+        definition=manifest.definition.model_dump(),
+        status="stopped",
+    )
+    db.add(infra)
+    db.commit()
+    db.refresh(infra)
+    infra = _get_infra_or_404(db, infra.id)
+    return _serialize_infrastructure(infra, current_user)
+
+
+@router.get("/{infra_id}/export")
+def export_infrastructure(
+    infra_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Exporte une infrastructure sous forme d'archive .zip déclarative.
+    Accessible au propriétaire ainsi qu'aux utilisateurs ayant un accès lecture seule.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_can_read(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    zip_bytes, filename = build_infra_zip(infra.name, infra.description, definition)
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{infra_id}", response_model=InfrastructureOut)

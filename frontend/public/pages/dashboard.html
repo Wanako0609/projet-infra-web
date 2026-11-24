@@ -28,10 +28,10 @@
             <div id="module-catalog-list" class="card-grid"></div>
         </section>
 
-        <section class="dashboard-section">
-            <h3>Nouvelle infrastructure</h3>
-            <form id="create-infra-form" class="card create-form" onsubmit="handleCreateInfrastructure(event)">
-                <div class="form-row">
+        <div class="forms-grid">
+            <section class="dashboard-section">
+                <h3>Nouvelle infrastructure</h3>
+                <form id="create-infra-form" class="card create-form" onsubmit="handleCreateInfrastructure(event)">
                     <div class="form-group">
                         <label for="infra-name">Nom de l'infrastructure</label>
                         <input type="text" id="infra-name" required maxlength="120" placeholder="Ex : TP Réseau + PostgreSQL">
@@ -40,14 +40,30 @@
                         <label for="infra-description">Description (optionnelle)</label>
                         <input type="text" id="infra-description" maxlength="2000" placeholder="Ex : Labo de démonstration NSY115">
                     </div>
-                </div>
-                <label class="checkbox-row">
-                    <input type="checkbox" id="infra-with-sample" checked>
-                    Pré-remplir avec un exemple (1 base PostgreSQL + 1 poste Linux reliés)
-                </label>
-                <button type="submit" class="btn-primary btn-inline">Créer l'infrastructure</button>
-            </form>
-        </section>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="infra-with-sample" checked>
+                        Pré-remplir avec un exemple (1 base PostgreSQL + 1 poste Linux reliés)
+                    </label>
+                    <button type="submit" class="btn-primary btn-inline">Créer l'infrastructure</button>
+                </form>
+            </section>
+
+            <section class="dashboard-section">
+                <h3>Importer une archive (.zip)</h3>
+                <form id="import-infra-form" class="card create-form" onsubmit="handleImportInfrastructure(event)">
+                    <div class="form-group">
+                        <label for="import-file">Fichier d'archive (.zip)</label>
+                        <input type="file" id="import-file" accept=".zip,application/zip" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="import-name">Renommer à l'import (optionnel)</label>
+                        <input type="text" id="import-name" maxlength="120" placeholder="Laisser vide pour garder le nom de l'archive">
+                    </div>
+                    <p class="import-hint">Seuls <code>infra.json</code> et <code>configs/</code> sont lus et validés ; tout script éventuel est ignoré.</p>
+                    <button type="submit" class="btn-primary btn-inline">Importer (.zip)</button>
+                </form>
+            </section>
+        </div>
 
         <div class="spaces-grid">
             <section class="dashboard-section">

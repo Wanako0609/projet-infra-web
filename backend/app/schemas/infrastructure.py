@@ -150,3 +150,12 @@ class InfrastructureOut(BaseModel):
 class InfrastructureListOut(BaseModel):
     owned: list[InfrastructureOut]
     shared: list[InfrastructureOut]
+
+
+class InfraExportManifest(BaseModel):
+    """Manifeste déclaratif contenu dans infra.json à l'intérieur d'une archive .zip."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    name: str = Field(..., min_length=1, max_length=120)
+    description: str = Field(default="", max_length=2000)
+    definition: InfrastructureDefinition

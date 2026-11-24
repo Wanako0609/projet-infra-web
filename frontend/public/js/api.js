@@ -37,3 +37,59 @@ async function apiFetch(endpoint, options = {}) {
 
     return response.json();
 }
+
+// Envoi multipart/form-data (upload de fichier .zip) : ne pas fixer Content-Type à la main
+async function apiUpload(endpoint, formData) {
+    const token = localStorage.getItem('access_token');
+    const headers = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Erreur lors de l\'import' }));
+        throw new Error(extractErrorMessage(error));
+    }
+
+    return response.json();
+}
+
+// Téléchargement binaire authentifié (un lien <a href> ne peut pas envoyer le header Bearer)
+async function apiDownload(endpoint, fallbackFilename = 'infrastructure.zip') {
+    const token = localStorage.getItem('access_token');
+    const headers = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers,
+    });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Erreur lors du téléchargement' }));
+        throw new Error(extractErrorMessage(error));
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match ? match[1] : fallbackFilename;
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return filename;
+}

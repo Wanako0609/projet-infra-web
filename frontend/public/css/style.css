@@ -150,10 +150,17 @@ main {
     gap: 1rem;
 }
 
-.spaces-grid {
+.spaces-grid,
+.forms-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
     gap: 1.5rem;
+}
+
+.import-hint {
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    color: #64748b;
 }
 
 .stack-list {

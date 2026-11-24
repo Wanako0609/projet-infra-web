@@ -141,6 +141,9 @@ function renderOwnedInfrastructures() {
                         <button type="button" class="btn-secondary" onclick="inspectInfrastructure(${infra.id})">
                             Inspecter
                         </button>
+                        <button type="button" class="btn-secondary" onclick="handleExportInfrastructure(${infra.id})">
+                            Exporter (.zip)
+                        </button>
                         <button type="button" class="btn-danger" onclick="handleDeleteInfrastructure(${infra.id})">
                             Supprimer
                         </button>
@@ -178,6 +181,9 @@ function renderSharedInfrastructures() {
                     <div class="card-actions">
                         <button type="button" class="btn-secondary" onclick="inspectInfrastructure(${infra.id})">
                             Consulter
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="handleExportInfrastructure(${infra.id})">
+                            Exporter (.zip)
                         </button>
                     </div>
                 </article>
@@ -262,6 +268,49 @@ async function handleCreateInfrastructure(event) {
         state.selectedInfra = created;
         renderSelectedInfrastructure();
         showDashboardMessage(`Infrastructure « ${created.name} » créée.`);
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
+}
+
+async function handleExportInfrastructure(infraId) {
+    clearDashboardMessage();
+    try {
+        const filename = await apiDownload(
+            `/infrastructures/${infraId}/export`,
+            `infrastructure-${infraId}.zip`
+        );
+        showDashboardMessage(`Archive « ${filename} » téléchargée.`);
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
+}
+
+async function handleImportInfrastructure(event) {
+    event.preventDefault();
+    clearDashboardMessage();
+
+    const fileInput = document.getElementById('import-file');
+    const nameInput = document.getElementById('import-name');
+    const file = fileInput.files[0];
+    if (!file) {
+        showDashboardMessage('Veuillez sélectionner un fichier .zip.', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (nameInput.value.trim()) {
+        formData.append('name', nameInput.value.trim());
+    }
+
+    try {
+        const imported = await apiUpload('/infrastructures/import', formData);
+        event.target.reset();
+        await refreshInfrastructures();
+        state.selectedInfra = imported;
+        renderSelectedInfrastructure();
+        showDashboardMessage(`Infrastructure « ${imported.name} » importée avec succès.`);
     } catch (error) {
         showDashboardMessage(error.message, 'error');
     }

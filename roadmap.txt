@@ -82,7 +82,7 @@ Réalisé :
       partages et aperçu JSON de la topologie.
 
 --------------------------------------------------------------------------------
-ÉTAPE 2 : FORMAT DE FICHIER DÉDIÉ (EXPORT & IMPORT .ZIP)               [À FAIRE]
+ÉTAPE 2 : FORMAT DE FICHIER DÉDIÉ (EXPORT & IMPORT .ZIP)              [TERMINÉE]
 --------------------------------------------------------------------------------
 Objectif : Permettre la sauvegarde portable et le partage hors-ligne d'une
 infrastructure via une archive .zip déclarative (zéro script exécuté à l'import).
@@ -95,18 +95,22 @@ Principe & limite assumée en V1 :
 - Les installations manuelles hors /workspace (ex. apt install à la volée dans
   un conteneur) ne sont pas incluses dans l'export en V1.
 
-À faire :
-[ ] Générer un bundle .zip déclaratif à l'export (GET /api/infrastructures/{id}/export) :
-    - infra.json (topologie + paramètres validés)
-    - configs/<node_id>/... (init.sql, fichiers workspace/...)
-    - docker-compose.yml généré côté serveur (bonus pour lancement local hors
-      plateforme, systématiquement ignoré à l'import)
-[ ] Endpoint POST /api/infrastructures/import :
-    - Lecture stricte de infra.json + configs/ uniquement (ignore tout script
-      ou docker-compose.yml)
-    - Validation Pydantic contre le catalogue + protection anti-Zip Slip et
-      limites de taille (anti zip-bomb)
-[ ] Boutons Exporter / Importer sur l'interface web.
+Réalisé :
+[x] Service d'archive sécurisé (backend/app/services/infra_archive.py) :
+    - Export .zip contenant infra.json, configs/<node_id>/..., README.txt et
+      un docker-compose.yml indicatif généré côté serveur (pour test local).
+    - Import strictement déclaratif : ne lit que infra.json et configs/ (ignore
+      tout script .sh ou docker-compose.yml), protection anti-Zip Slip, blocage
+      des liens symboliques, lecture plafonnée anti zip-bomb et validation
+      Pydantic complète contre le catalogue.
+[x] Routes API (backend/app/api/infrastructures.py) :
+    - GET /api/infrastructures/{id}/export (propriétaire ou lecture seule)
+    - POST /api/infrastructures/import (multipart/form-data + renommage optionnel)
+    - Exposition CORS de Content-Disposition dans backend/main.py.
+[x] Front-end (js/api.js, js/dashboard.js, pages/dashboard.html) :
+    - Helpers apiUpload (FormData) et apiDownload (Blob authentifié par JWT).
+    - Boutons Exporter (.zip) sur Mes infrastructures et Partagées avec moi.
+    - Formulaire Importer (.zip) sur le tableau de bord.
 
 --------------------------------------------------------------------------------
 ÉTAPE 3 : MOTEUR D'ORCHESTRATION DOCKER                                [À FAIRE]
