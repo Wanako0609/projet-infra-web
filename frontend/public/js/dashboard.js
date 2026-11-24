@@ -6,6 +6,7 @@ let state = {
     owned: [],
     shared: [],
     selectedInfra: null,
+    selectedRuntime: null,
 };
 
 function escapeHtml(text) {
@@ -117,11 +118,12 @@ function renderOwnedInfrastructures() {
                           )
                           .join('');
 
+            const isRunning = infra.status === 'running';
             return `
                 <article class="card infra-card">
                     <div class="card-header">
                         <h4>${escapeHtml(infra.name)}</h4>
-                        <span class="badge badge-status">${escapeHtml(infra.status)}</span>
+                        <span class="badge ${isRunning ? 'badge-running' : 'badge-status'}">${escapeHtml(infra.status)}</span>
                     </div>
                     <p class="card-desc">${escapeHtml(infra.description || 'Sans description')}</p>
                     <div class="card-meta">
@@ -138,6 +140,11 @@ function renderOwnedInfrastructures() {
                     </div>
 
                     <div class="card-actions">
+                        ${
+                            isRunning
+                                ? `<button type="button" class="btn-warn" onclick="handleStopInfrastructure(${infra.id})">Arrêter</button>`
+                                : `<button type="button" class="btn-success" onclick="handleStartInfrastructure(${infra.id})">Démarrer</button>`
+                        }
                         <button type="button" class="btn-secondary" onclick="inspectInfrastructure(${infra.id})">
                             Inspecter
                         </button>
@@ -211,7 +218,73 @@ function renderSelectedInfrastructure() {
         accessBadge.className = 'badge badge-readonly';
     }
 
+    const runtimeBox = document.getElementById('detail-runtime-box');
+    const rt = state.selectedRuntime;
+    if (!rt) {
+        runtimeBox.innerHTML = '<p class="muted">Chargement de l\'état Docker...</p>';
+    } else if (!rt.docker_available) {
+        runtimeBox.innerHTML =
+            '<p class="form-message error">Démon Docker indisponible. Vérifiez que Docker tourne pour piloter cette infrastructure.</p>';
+    } else {
+        const isOwner = infra.access_level === 'owner';
+        const netInfo = rt.network_name
+            ? `Réseau isolé : <code>${escapeHtml(rt.network_name)}</code> (${escapeHtml(rt.subnet || 'IPAM auto')})`
+            : 'Réseau isolé : inactif (infrastructure arrêtée)';
+
+        const rows = (rt.nodes || [])
+            .map((node) => {
+                const running = node.state === 'running';
+                const portNote = node.host_port
+                    ? `<span class="badge badge-neutral">Bureau local : 127.0.0.1:${node.host_port}</span>`
+                    : '';
+                let nodeBtn = '';
+                if (isOwner && rt.status === 'running') {
+                    nodeBtn = running
+                        ? `<button type="button" class="btn-warn btn-sm" onclick="handleStopNode(${infra.id}, '${escapeHtml(node.node_id)}')">Arrêter</button>`
+                        : `<button type="button" class="btn-success btn-sm" onclick="handleStartNode(${infra.id}, '${escapeHtml(node.node_id)}')">Démarrer${node.on_demand ? ' (à la demande)' : ''}</button>`;
+                }
+                return `
+                    <div class="runtime-node-row">
+                        <div>
+                            <strong>${escapeHtml(node.name)}</strong>
+                            <code>${escapeHtml(node.node_id)}</code>
+                            <span class="muted">(${escapeHtml(node.module_type)})</span>
+                            ${node.on_demand ? '<span class="badge badge-warn">À la demande</span>' : ''}
+                        </div>
+                        <div class="runtime-node-meta">
+                            <span class="badge ${running ? 'badge-running' : 'badge-status'}">${escapeHtml(node.state)}</span>
+                            <span>IP : <code>${escapeHtml(node.ip_address || '—')}</code></span>
+                            ${portNote}
+                            ${nodeBtn}
+                        </div>
+                    </div>
+                `;
+            })
+            .join('');
+
+        runtimeBox.innerHTML = `
+            <div class="runtime-header">
+                <strong>État Docker :</strong>
+                <span class="badge ${rt.status === 'running' ? 'badge-running' : 'badge-status'}">${escapeHtml(rt.status)}</span>
+                <span class="muted">${netInfo}</span>
+            </div>
+            <div class="runtime-nodes-list">${rows || '<p class="muted">Aucun module dans cette infrastructure.</p>'}</div>
+        `;
+    }
+
     document.getElementById('detail-json').textContent = JSON.stringify(infra.definition, null, 2);
+}
+
+async function refreshSelectedStatus() {
+    if (!state.selectedInfra) return;
+    try {
+        state.selectedRuntime = await apiFetch(`/infrastructures/${state.selectedInfra.id}/status`, {
+            method: 'GET',
+        });
+        renderSelectedInfrastructure();
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
 }
 
 async function refreshInfrastructures() {
@@ -225,6 +298,9 @@ async function refreshInfrastructures() {
     if (state.selectedInfra) {
         const all = [...state.owned, ...state.shared];
         state.selectedInfra = all.find((item) => item.id === state.selectedInfra.id) || null;
+        if (!state.selectedInfra) {
+            state.selectedRuntime = null;
+        }
         renderSelectedInfrastructure();
     }
 }
@@ -232,7 +308,12 @@ async function refreshInfrastructures() {
 async function inspectInfrastructure(infraId) {
     clearDashboardMessage();
     try {
-        state.selectedInfra = await apiFetch(`/infrastructures/${infraId}`, { method: 'GET' });
+        const [infra, runtime] = await Promise.all([
+            apiFetch(`/infrastructures/${infraId}`, { method: 'GET' }),
+            apiFetch(`/infrastructures/${infraId}/status`, { method: 'GET' }),
+        ]);
+        state.selectedInfra = infra;
+        state.selectedRuntime = runtime;
         renderSelectedInfrastructure();
     } catch (error) {
         showDashboardMessage(error.message, 'error');
@@ -241,7 +322,71 @@ async function inspectInfrastructure(infraId) {
 
 function closeDetailPanel() {
     state.selectedInfra = null;
+    state.selectedRuntime = null;
     renderSelectedInfrastructure();
+}
+
+async function handleStartInfrastructure(infraId) {
+    clearDashboardMessage();
+    showDashboardMessage('Démarrage du réseau isolé et des conteneurs Docker...');
+    try {
+        const runtime = await apiFetch(`/infrastructures/${infraId}/start`, { method: 'POST' });
+        await refreshInfrastructures();
+        const found = state.owned.find((item) => item.id === infraId);
+        if (found) {
+            state.selectedInfra = found;
+            state.selectedRuntime = runtime;
+            renderSelectedInfrastructure();
+        }
+        showDashboardMessage(`Infrastructure démarrée sur ${runtime.network_name} (${runtime.subnet || 'IPAM'}).`);
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
+}
+
+async function handleStopInfrastructure(infraId) {
+    clearDashboardMessage();
+    showDashboardMessage('Arrêt des conteneurs et suppression du réseau isolé...');
+    try {
+        const runtime = await apiFetch(`/infrastructures/${infraId}/stop`, { method: 'POST' });
+        await refreshInfrastructures();
+        if (state.selectedInfra && state.selectedInfra.id === infraId) {
+            state.selectedRuntime = runtime;
+            renderSelectedInfrastructure();
+        }
+        showDashboardMessage('Infrastructure arrêtée et nettoyée.');
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
+}
+
+async function handleStartNode(infraId, nodeId) {
+    clearDashboardMessage();
+    showDashboardMessage(`Démarrage du module ${nodeId}...`);
+    try {
+        const runtime = await apiFetch(`/infrastructures/${infraId}/nodes/${nodeId}/start`, {
+            method: 'POST',
+        });
+        state.selectedRuntime = runtime;
+        await refreshInfrastructures();
+        showDashboardMessage(`Module « ${nodeId} » démarré.`);
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
+}
+
+async function handleStopNode(infraId, nodeId) {
+    clearDashboardMessage();
+    try {
+        const runtime = await apiFetch(`/infrastructures/${infraId}/nodes/${nodeId}/stop`, {
+            method: 'POST',
+        });
+        state.selectedRuntime = runtime;
+        await refreshInfrastructures();
+        showDashboardMessage(`Module « ${nodeId} » arrêté.`);
+    } catch (error) {
+        showDashboardMessage(error.message, 'error');
+    }
 }
 
 async function handleCreateInfrastructure(event) {

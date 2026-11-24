@@ -50,6 +50,12 @@ L'interface sera disponible sur `http://localhost:3000`.
 
 *(Ou lancez l'ensemble des 3 services d'un coup avec `./dev.sh`.)*
 
+### 4. Préparer les images Docker du catalogue (une seule fois)
+```bash
+./docker/build-images.sh
+```
+*(Utilisez `./docker/build-images.sh --no-desktop` si vous souhaitez ne construire que `postgres` et `linux_net` dans un premier temps.)*
+
 ## Modèle de persistance & d'export (V1)
 
 Chaque module repose sur une **image Docker vérifiée du catalogue** (OS et outils préinstallés).  

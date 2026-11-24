@@ -15,6 +15,7 @@ dist/
 *.db
 *.sqlite
 .DS_Store
+backend/.runtime/
 
 # Documents locaux (ne pas pousser sur GitHub)
 Projet_plateforme_infrastructures_presentation.pdf

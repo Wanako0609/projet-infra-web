@@ -9,11 +9,13 @@ from app.schemas.infrastructure import (
     InfrastructureDefinition,
     InfrastructureListOut,
     InfrastructureOut,
+    InfrastructureRuntimeStatus,
     InfrastructureUpdate,
     ShareCreate,
     ShareOut,
 )
 from app.services.db import get_db
+from app.services.docker_orchestrator import OrchestratorError, orchestrator
 from app.services.infra_archive import (
     ArchiveError,
     MAX_ZIP_UPLOAD_BYTES,
@@ -268,14 +270,140 @@ def delete_infrastructure(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Supprime une infrastructure et ses partages associés (propriétaire uniquement).
+    Supprime une infrastructure, ses conteneurs Docker éventuels et ses partages (propriétaire uniquement).
     """
     infra = _get_infra_or_404(db, infra_id)
     _assert_is_owner(infra, current_user)
 
+    # Nettoyage Docker best-effort pour ne pas laisser de conteneurs orphelins
+    try:
+        definition = InfrastructureDefinition.model_validate(infra.definition or {})
+        orchestrator.stop_infrastructure(infra.id, definition)
+    except OrchestratorError:
+        pass
+
     db.delete(infra)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{infra_id}/start", response_model=InfrastructureRuntimeStatus)
+def start_infrastructure(
+    infra_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Déploie l'infrastructure sur Docker (réseau isolé + modules non 'à la demande').
+    Réservé au propriétaire.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_is_owner(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    try:
+        runtime = orchestrator.start_infrastructure(infra.id, definition)
+    except OrchestratorError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    infra.status = runtime.status
+    db.commit()
+    return runtime
+
+
+@router.post("/{infra_id}/stop", response_model=InfrastructureRuntimeStatus)
+def stop_infrastructure(
+    infra_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Arrête et nettoie tous les conteneurs et le réseau isolé de l'infrastructure.
+    Réservé au propriétaire.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_is_owner(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    try:
+        runtime = orchestrator.stop_infrastructure(infra.id, definition)
+    except OrchestratorError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    infra.status = runtime.status
+    db.commit()
+    return runtime
+
+
+@router.get("/{infra_id}/status", response_model=InfrastructureRuntimeStatus)
+def get_infrastructure_status(
+    infra_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retourne l'état temps réel des conteneurs et du réseau Docker.
+    Accessible au propriétaire ainsi qu'aux utilisateurs en lecture seule.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_can_read(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    runtime = orchestrator.get_infrastructure_status(infra.id, definition)
+    if runtime.docker_available and infra.status != runtime.status:
+        infra.status = runtime.status
+        db.commit()
+    return runtime
+
+
+@router.post("/{infra_id}/nodes/{node_id}/start", response_model=InfrastructureRuntimeStatus)
+def start_infrastructure_node(
+    infra_id: int,
+    node_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Démarre un module spécifique (utile pour les postes graphiques à la demande).
+    Réservé au propriétaire.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_is_owner(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    try:
+        runtime = orchestrator.start_node(infra.id, definition, node_id)
+    except OrchestratorError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    infra.status = runtime.status
+    db.commit()
+    return runtime
+
+
+@router.post("/{infra_id}/nodes/{node_id}/stop", response_model=InfrastructureRuntimeStatus)
+def stop_infrastructure_node(
+    infra_id: int,
+    node_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Arrête un module spécifique (ex. couper le poste graphique pour libérer la RAM).
+    Réservé au propriétaire.
+    """
+    infra = _get_infra_or_404(db, infra_id)
+    _assert_is_owner(infra, current_user)
+
+    definition = InfrastructureDefinition.model_validate(infra.definition or {})
+    try:
+        runtime = orchestrator.stop_node(infra.id, definition, node_id)
+    except OrchestratorError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    infra.status = runtime.status
+    db.commit()
+    return runtime
 
 
 @router.post("/{infra_id}/shares", response_model=ShareOut, status_code=status.HTTP_201_CREATED)

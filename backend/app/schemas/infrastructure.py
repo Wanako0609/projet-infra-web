@@ -65,6 +65,19 @@ class NodeDefinition(BaseModel):
                 )
         return files
 
+    @model_validator(mode="after")
+    def validate_module_specific_files(self) -> "NodeDefinition":
+        # Défense en profondeur : l'entrypoint PostgreSQL exécute aussi les *.sh dans
+        # /docker-entrypoint-initdb.d/. On n'autorise donc strictement que des fichiers .sql.
+        if self.module_type == "postgres":
+            for rel_path in self.files:
+                parts = PurePosixPath(rel_path).parts
+                if len(parts) != 1 or not rel_path.lower().endswith(".sql"):
+                    raise ValueError(
+                        f"Pour un module PostgreSQL, seuls les fichiers '.sql' à la racine sont autorisés (reçu '{rel_path}')."
+                    )
+        return self
+
 
 class LinkDefinition(BaseModel):
     id: str
@@ -159,3 +172,23 @@ class InfraExportManifest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     definition: InfrastructureDefinition
+
+
+class NodeRuntimeStatus(BaseModel):
+    node_id: str
+    name: str
+    module_type: str
+    on_demand: bool
+    state: str
+    ip_address: str | None = None
+    host_port: int | None = None
+    container_name: str
+
+
+class InfrastructureRuntimeStatus(BaseModel):
+    infra_id: int
+    status: Literal["running", "stopped"]
+    docker_available: bool = True
+    network_name: str | None = None
+    subnet: str | None = None
+    nodes: list[NodeRuntimeStatus] = Field(default_factory=list)

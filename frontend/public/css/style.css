@@ -68,12 +68,37 @@ main {
 
 .btn-primary,
 .btn-secondary,
+.btn-success,
+.btn-warn,
 .btn-danger {
     cursor: pointer;
     padding: 0.55rem 1rem;
     border: none;
     border-radius: 4px;
     font-size: 0.9rem;
+}
+
+.btn-sm {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.8rem;
+}
+
+.btn-success {
+    background-color: #16a34a;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #15803d;
+}
+
+.btn-warn {
+    background-color: #d97706;
+    color: #fff;
+}
+
+.btn-warn:hover {
+    background-color: #b45309;
 }
 
 .btn-primary {
@@ -242,6 +267,53 @@ main {
 .badge-status {
     background: #f1f5f9;
     color: #475569;
+}
+
+.badge-running {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.runtime-box {
+    margin: 1rem 0 1.25rem;
+    padding: 0.9rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+
+.runtime-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+
+.runtime-nodes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.runtime-node-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.88rem;
+}
+
+.runtime-node-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
 }
 
 .badge-owner {

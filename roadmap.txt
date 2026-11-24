@@ -113,24 +113,38 @@ Réalisé :
     - Formulaire Importer (.zip) sur le tableau de bord.
 
 --------------------------------------------------------------------------------
-ÉTAPE 3 : MOTEUR D'ORCHESTRATION DOCKER                                [À FAIRE]
+ÉTAPE 3 : MOTEUR D'ORCHESTRATION DOCKER                               [TERMINÉE]
 --------------------------------------------------------------------------------
 Objectif : Transformer une définition d'infrastructure en vrais conteneurs
 isolés qui communiquent entre eux.
 
-À faire :
-[ ] Créer un service dédié (backend/app/services/docker_orchestrator.py) via le
-    SDK Python docker.
-[ ] Isolation réseau : créer un réseau Docker bridge dédié par infrastructure
-    déployée (ex. infra_<id>_net) avec résolution DNS par nom de module.
-[ ] Préparer les images vérifiées :
-    - Image PostgreSQL (configuration mot de passe / BDD via variables d'env)
-    - Dockerfile poste Linux réseau (iproute2, ping, tcpdump, curl, netcat...)
-    - Image poste Linux graphique à la demande (bureau léger + noVNC/KasmVNC)
-[ ] Cycle de vie & sécurité :
-    - Routes POST /start, POST /stop, GET /status (état temps réel des modules)
-    - Nettoyage propre des conteneurs et réseaux à l'arrêt
-    - Quotas RAM/CPU, liste blanche d'images, pas de montage hôte non autorisé.
+Réalisé :
+[x] Images vérifiées & build (docker/) :
+    - postgres:15-alpine (image officielle)
+    - docker/linux-net/Dockerfile (Alpine + iproute2, iputils, tcpdump, curl,
+      bind-tools, netcat-openbsd, postgresql16-client, bash, nano)
+    - docker/linux-desktop/Dockerfile (lscr.io/linuxserver/wireshark:latest +
+      outils réseau/psql, KasmVNC sur :3000 à la demande)
+    - docker/build-images.sh pour préparer toutes les images en une commande
+[x] Orchestrateur Docker (backend/app/services/docker_orchestrator.py) :
+    - Isolation réseau bridge L2 par infrastructure (infra_<id>_net) avec
+      allocation dynamique et recyclage automatique des /24 (10.100..250.1..250.0/24)
+    - Résolution DNS interne par node.id + conservation optionnelle du dernier
+      octet IP dans le /24 alloué
+    - Matérialisation sécurisée de init.sql (:ro) et /workspace (:rw) dans
+      backend/.runtime/ (ignoré par Git)
+    - Quotas RAM/CPU/PIDs, privileged=False, capabilities ciblées (NET_ADMIN +
+      NET_RAW sur les postes Linux), shm_size + seccomp pour KasmVNC, port local
+      dynamique sur 127.0.0.1 pour le bureau web
+    - Démarrage des modules on_demand (linux_desktop) uniquement à la demande
+[x] Routes API (backend/app/api/infrastructures.py) :
+    - POST /start, POST /stop, GET /status (propriétaire pour start/stop,
+      lecture seule autorisée pour status)
+    - POST /nodes/{node_id}/start et /stop (contrôle individuel à la demande)
+    - Nettoyage Docker automatique lors de DELETE /infrastructures/{id}
+[x] Front-end (pages/dashboard.html + js/dashboard.js) :
+    - Boutons Démarrer / Arrêter, panneau d'état Docker en direct (réseau,
+      sous-réseau, IP, statut) et démarrage/arrêt par module à la demande.
 
 --------------------------------------------------------------------------------
 ÉTAPE 4 : INTERFACE VISUELLE « PLUG & PLAY » (CANEVAS)                 [À FAIRE]

@@ -2,7 +2,7 @@
 Catalogue des modules vérifiés (périmètre V1).
 
 Seuls les types déclarés ici peuvent être utilisés dans une infrastructure
-et orchestrés par Docker (liste blanche stricte + quotas RAM/CPU).
+et orchestrés par Docker (liste blanche stricte + quotas RAM/CPU + capabilities).
 """
 
 from typing import Any
@@ -18,8 +18,15 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "memory_mb": 150,
         "memory_limit": "256m",
         "cpu_limit": 0.5,
+        "pids_limit": 128,
         "on_demand": False,
         "workspace_path": "/docker-entrypoint-initdb.d",
+        # PostgreSQL nécessite ces capabilities pour son entrypoint (chown / gosu postgres)
+        "cap_drop": ["ALL"],
+        "cap_add": ["CHOWN", "SETUID", "SETGID", "DAC_OVERRIDE", "FOWNER"],
+        "shm_size": None,
+        "seccomp_unconfined": False,
+        "web_port": None,
         "default_config": {
             "db_name": "app_db",
             "db_user": "postgres",
@@ -32,13 +39,20 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "label": "Poste Linux Réseau",
         "category": "reseau",
         "category_label": "Réseau",
-        "description": "Poste Linux minimal équipé des outils réseau (iproute2, ping, curl, tcpdump).",
+        "description": "Poste Linux minimal équipé des outils réseau (iproute2, ping, curl, tcpdump, psql).",
         "docker_image": "infra-web/linux-net:v1",
         "memory_mb": 200,
         "memory_limit": "256m",
         "cpu_limit": 0.5,
+        "pids_limit": 128,
         "on_demand": False,
         "workspace_path": "/workspace",
+        # NET_ADMIN (ip addr / ip route) + NET_RAW (ping / tcpdump) dans le réseau isolé
+        "cap_drop": ["ALL"],
+        "cap_add": ["NET_ADMIN", "NET_RAW"],
+        "shm_size": None,
+        "seccomp_unconfined": False,
+        "web_port": None,
         "default_config": {
             "hostname": "poste-linux",
             "ip_address": "",
@@ -50,13 +64,20 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
         "label": "Poste Linux Graphique",
         "category": "graphique",
         "category_label": "Graphique (à la demande)",
-        "description": "Poste Linux avec bureau graphique accessible dans le navigateur (Wireshark, outils visuels).",
+        "description": "Poste Linux avec bureau web KasmVNC et Wireshark (démarré uniquement à la demande).",
         "docker_image": "infra-web/linux-desktop:v1",
         "memory_mb": 800,
         "memory_limit": "1024m",
         "cpu_limit": 1.0,
+        "pids_limit": 256,
         "on_demand": True,
         "workspace_path": "/workspace",
+        # s6-overlay + KasmVNC ont besoin des capabilities de base + NET_ADMIN/NET_RAW + shm_size + seccomp
+        "cap_drop": [],
+        "cap_add": ["NET_ADMIN", "NET_RAW"],
+        "shm_size": "512m",
+        "seccomp_unconfined": True,
+        "web_port": 3000,
         "default_config": {
             "hostname": "poste-bureau",
             "ip_address": "",
@@ -67,7 +88,7 @@ MODULE_CATALOG: dict[str, dict[str, Any]] = {
 
 
 def get_catalog_list() -> list[dict[str, Any]]:
-    """Retourne la liste des modules exposés au front-end."""
+    """Retourne la liste des modules exposés au front-end (sans les détails internes Docker)."""
     return [
         {
             "type": item["type"],

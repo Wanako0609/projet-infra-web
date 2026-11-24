@@ -83,8 +83,14 @@
                     <h3 id="detail-title"></h3>
                     <span id="detail-access-badge" class="badge"></span>
                 </div>
-                <button type="button" class="btn-secondary" onclick="closeDetailPanel()">Fermer</button>
+                <div class="card-actions" style="margin-top: 0;">
+                    <button type="button" class="btn-secondary" onclick="refreshSelectedStatus()">Rafraîchir l'état Docker</button>
+                    <button type="button" class="btn-secondary" onclick="closeDetailPanel()">Fermer</button>
+                </div>
             </div>
+
+            <div id="detail-runtime-box" class="runtime-box"></div>
+
             <p class="muted">Aperçu de la définition JSON (le canevas visuel glisser-déposer arrive à l'Étape 4) :</p>
             <pre id="detail-json" class="json-preview"></pre>
         </section>
