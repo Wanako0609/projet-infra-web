@@ -140,6 +140,9 @@ function renderOwnedInfrastructures() {
                     </div>
 
                     <div class="card-actions">
+                        <a class="btn-primary btn-inline btn-link" href="editor.html?id=${infra.id}">
+                            Ouvrir l'atelier
+                        </a>
                         ${
                             isRunning
                                 ? `<button type="button" class="btn-warn" onclick="handleStopInfrastructure(${infra.id})">Arrêter</button>`
@@ -186,6 +189,9 @@ function renderSharedInfrastructures() {
                         <span>${linkCount} lien(s)</span>
                     </div>
                     <div class="card-actions">
+                        <a class="btn-primary btn-inline btn-link" href="editor.html?id=${infra.id}">
+                            Ouvrir (lecture seule)
+                        </a>
                         <button type="button" class="btn-secondary" onclick="inspectInfrastructure(${infra.id})">
                             Consulter
                         </button>

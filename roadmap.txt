@@ -147,18 +147,28 @@ Réalisé :
       sous-réseau, IP, statut) et démarrage/arrêt par module à la demande.
 
 --------------------------------------------------------------------------------
-ÉTAPE 4 : INTERFACE VISUELLE « PLUG & PLAY » (CANEVAS)                 [À FAIRE]
+ÉTAPE 4 : INTERFACE VISUELLE « PLUG & PLAY » (CANEVAS)                [TERMINÉE]
 --------------------------------------------------------------------------------
 Objectif : Construire et piloter une infrastructure à la souris depuis le
 navigateur.
 
-À faire :
-[ ] Intégrer un canevas interactif (glisser-déposer des modules du catalogue,
-    positionnement libre, zoom/déplacement).
-[ ] Tracer et supprimer des liens réseau entre modules.
-[ ] Panneau d'actions : Sauvegarder, Exporter, Démarrer / Arrêter l'infra,
-    statut visuel de chaque module (arrêté / démarré / erreur).
-[ ] Mode lecture seule : verrouiller toute modification sur les infras partagées.
+Réalisé :
+[x] Page dédiée d'atelier visuel (pages/editor.html, css/editor.css,
+    js/editor.js) en HTML5/SVG/JS natif (zéro dépendance externe) :
+    - Palette gauche chargée depuis GET /api/modules (glisser-déposer ou clic)
+    - Canevas central à grille avec déplacement libre des boîtes à la souris
+    - Tracé interactif de liens réseau en courbes SVG depuis les poignées et
+      suppression de liens au clic
+    - Inspecteur droit pour configurer chaque module (paramètres PostgreSQL +
+      init.sql, hostname/IP/gateway + workspace/consigne.txt pour Linux)
+    - Barre d'actions : Sauvegarder (PUT), Démarrer/Arrêter, Rafraîchir état
+      Docker, Exporter (.zip) + pastilles d'état et IP en direct sur les nœuds
+    - Contrôle individuel des modules à la demande (linux_desktop)
+[x] Mode lecture seule complet : bandeau d'information + verrouillage du drag,
+    des liens, de l'inspecteur, de la sauvegarde et du déploiement sur les
+    infrastructures partagées.
+[x] Liens directs « Ouvrir l'atelier » / « Ouvrir (lecture seule) » depuis le
+    tableau de bord (js/dashboard.js).
 
 --------------------------------------------------------------------------------
 ÉTAPE 5 : ACCÈS AUX MODULES PAR DOUBLE-CLIC                            [À FAIRE]

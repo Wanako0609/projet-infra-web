@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atelier visuel - Infra Web</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/editor.css">
+</head>
+<body class="editor-body">
+    <header class="editor-topbar">
+        <div class="topbar-left">
+            <a href="dashboard.html" class="back-link">← Tableau de bord</a>
+            <div class="infra-title-group">
+                <h1 id="editor-infra-name">Chargement...</h1>
+                <div class="topbar-badges">
+                    <span id="editor-access-badge" class="badge"></span>
+                    <span id="editor-status-badge" class="badge badge-status">stopped</span>
+                    <span id="editor-network-info" class="topbar-meta"></span>
+                    <span id="editor-dirty-badge" class="badge badge-warn" hidden>Non sauvegardé</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="topbar-actions">
+            <button type="button" id="btn-save" class="btn-primary btn-inline" onclick="handleSave()">
+                Sauvegarder
+            </button>
+            <button type="button" id="btn-start" class="btn-success" onclick="handleStartInfra()">
+                Démarrer
+            </button>
+            <button type="button" id="btn-stop" class="btn-warn" onclick="handleStopInfra()" hidden>
+                Arrêter
+            </button>
+            <button type="button" id="btn-refresh-status" class="btn-secondary" onclick="refreshRuntimeStatus()">
+                Rafraîchir état
+            </button>
+            <button type="button" id="btn-export" class="btn-secondary" onclick="handleExport()">
+                Exporter (.zip)
+            </button>
+            <button type="button" class="btn-danger" onclick="logout()">Déconnexion</button>
+        </div>
+    </header>
+
+    <div id="editor-toast" class="editor-toast" hidden></div>
+
+    <div class="editor-layout">
+        <!-- 1. Palette des modules vérifiés -->
+        <aside class="editor-palette">
+            <h2>Catalogue</h2>
+            <p id="palette-hint" class="muted">Glissez un module sur le canevas (ou cliquez dessus) pour l'ajouter.</p>
+            <div id="palette-list" class="palette-list"></div>
+
+            <div class="palette-help">
+                <h3>Raccourcis</h3>
+                <ul>
+                    <li><strong>Déplacer</strong> : glisser une boîte</li>
+                    <li><strong>Relier</strong> : tirer depuis le point bleu d'un module vers un autre</li>
+                    <li><strong>Supprimer un lien</strong> : cliquer sur la croix au milieu du câble</li>
+                    <li><strong>Configurer</strong> : cliquer sur un module</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- 2. Canevas visuel interactif (SVG liens + nœuds HTML) -->
+        <section class="canvas-wrapper">
+            <div id="readonly-banner" class="readonly-banner" hidden>
+                Mode lecture seule — vous consultez une infrastructure partagée. Les modifications et le déploiement sont désactivés.
+            </div>
+            <div id="canvas-stage" class="canvas-stage">
+                <svg id="links-svg" class="links-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="nodes-layer" class="nodes-layer"></div>
+                <div id="canvas-empty-hint" class="canvas-empty-hint" hidden>
+                    Glissez un module depuis le catalogue de gauche pour construire votre infrastructure.
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Inspecteur du module sélectionné -->
+        <aside class="editor-inspector">
+            <h2>Inspecteur</h2>
+            <div id="inspector-empty" class="empty-state">
+                Sélectionnez un module sur le canevas pour consulter ou modifier sa configuration, ses fichiers et son état Docker.
+            </div>
+            <div id="inspector-content" hidden>
+                <div class="inspector-header">
+                    <div>
+                        <strong id="insp-type-label"></strong>
+                        <div class="muted">ID / DNS : <code id="insp-node-id"></code></div>
+                    </div>
+                    <span id="insp-runtime-badge" class="badge badge-status">stopped</span>
+                </div>
+
+                <div id="insp-runtime-panel" class="insp-runtime-panel">
+                    <div>IP isolée : <code id="insp-ip">—</code></div>
+                    <div id="insp-port-row" hidden>Bureau local : <code id="insp-port"></code></div>
+                    <div id="insp-node-controls" class="insp-node-controls"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="insp-name">Nom affiché</label>
+                    <input type="text" id="insp-name" maxlength="80">
+                </div>
+
+                <!-- Champs spécifiques PostgreSQL -->
+                <div id="insp-postgres-fields" hidden>
+                    <div class="form-group">
+                        <label for="insp-db-name">Nom de la base (POSTGRES_DB)</label>
+                        <input type="text" id="insp-db-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-db-user">Utilisateur (POSTGRES_USER)</label>
+                        <input type="text" id="insp-db-user">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-db-password">Mot de passe (POSTGRES_PASSWORD)</label>
+                        <input type="text" id="insp-db-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-db-ip">IP souhaitée (optionnel, ex. 10.10.0.10)</label>
+                        <input type="text" id="insp-db-ip" placeholder="Automatique si vide">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-init-sql">Script SQL d'initialisation (<code>init.sql</code>)</label>
+                        <textarea id="insp-init-sql" rows="6" placeholder="CREATE TABLE ...;"></textarea>
+                    </div>
+                </div>
+
+                <!-- Champs spécifiques Linux (linux_net & linux_desktop) -->
+                <div id="insp-linux-fields" hidden>
+                    <div class="form-group">
+                        <label for="insp-hostname">Hostname</label>
+                        <input type="text" id="insp-hostname">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-linux-ip">IP souhaitée (optionnel, ex. 10.10.0.20)</label>
+                        <input type="text" id="insp-linux-ip" placeholder="Automatique si vide">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-gateway">Passerelle (optionnel)</label>
+                        <input type="text" id="insp-gateway" placeholder="Par défaut celle du réseau">
+                    </div>
+                    <div class="form-group">
+                        <label for="insp-workspace-file">Fichier <code>workspace/consigne.txt</code></label>
+                        <textarea id="insp-workspace-file" rows="5" placeholder="Instructions ou notes placées dans /workspace..."></textarea>
+                    </div>
+                </div>
+
+                <div class="inspector-footer">
+                    <button type="button" id="btn-delete-node" class="btn-danger" onclick="handleDeleteSelectedNode()">
+                        Supprimer ce module
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/editor.js"></script>
+</body>
+</html>

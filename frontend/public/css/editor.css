@@ -1,0 +1,451 @@
+/* Mise en page plein écran de l'atelier visuel (Étape 4) */
+
+.editor-body {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #f1f5f9;
+}
+
+.editor-topbar {
+    background-color: #0f172a;
+    color: #fff;
+    padding: 0.7rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #334155;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.back-link {
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid #334155;
+    border-radius: 6px;
+}
+
+.back-link:hover {
+    background: #1e293b;
+    color: #fff;
+}
+
+.infra-title-group h1 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.topbar-badges {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.25rem;
+}
+
+.topbar-meta {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.editor-toast {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.editor-toast.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.editor-toast.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.editor-toast.info {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.editor-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 250px 1fr 310px;
+    min-height: 0;
+}
+
+/* --- Palette gauche --- */
+.editor-palette {
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.editor-palette h2,
+.editor-inspector h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: #0f172a;
+}
+
+.palette-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.palette-item {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.7rem;
+    background: #f8fafc;
+    cursor: grab;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    user-select: none;
+}
+
+.palette-item:hover:not(.disabled) {
+    border-color: #2563eb;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+    transform: translateY(-1px);
+}
+
+.palette-item.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.palette-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.3rem;
+}
+
+.palette-item-desc {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #475569;
+}
+
+.palette-help {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e2e8f0;
+    font-size: 0.8rem;
+    color: #475569;
+}
+
+.palette-help h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    color: #1e293b;
+}
+
+.palette-help ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+/* --- Canevas central --- */
+.canvas-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+}
+
+.readonly-banner {
+    background: #fef3c7;
+    color: #92400e;
+    padding: 0.5rem 1rem;
+    font-size: 0.88rem;
+    border-bottom: 1px solid #fcd34d;
+    text-align: center;
+}
+
+.canvas-stage {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background-color: #f8fafc;
+    background-image: radial-gradient(#cbd5e1 1.1px, transparent 1.1px);
+    background-size: 22px 22px;
+}
+
+.canvas-stage.drag-over {
+    outline: 3px dashed #2563eb;
+    outline-offset: -6px;
+    background-color: #eff6ff;
+}
+
+.links-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-width: 1400px;
+    min-height: 900px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.nodes-layer {
+    position: relative;
+    min-width: 1400px;
+    min-height: 900px;
+    z-index: 2;
+}
+
+.canvas-empty-hint {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.92);
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    color: #64748b;
+    font-size: 0.95rem;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* --- Nœuds sur le canevas --- */
+.canvas-node {
+    position: absolute;
+    width: 210px;
+    background: #fff;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    padding: 0.65rem 0.75rem;
+    cursor: grab;
+    user-select: none;
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.canvas-node.readonly {
+    cursor: pointer;
+}
+
+.canvas-node:active:not(.readonly) {
+    cursor: grabbing;
+}
+
+.canvas-node.selected {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+
+.canvas-node.link-target-highlight {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.28);
+}
+
+.canvas-node.type-postgres {
+    border-top: 4px solid #0284c7;
+}
+
+.canvas-node.type-linux_net {
+    border-top: 4px solid #16a34a;
+}
+
+.canvas-node.type-linux_desktop {
+    border-top: 4px solid #9333ea;
+}
+
+.node-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.3rem;
+}
+
+.node-title {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #94a3b8;
+}
+
+.status-dot.running {
+    background: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.22);
+}
+
+.node-sub {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.node-ip {
+    font-size: 0.76rem;
+    color: #334155;
+    background: #f1f5f9;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.node-connect-handle {
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2563eb;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.3);
+    cursor: crosshair;
+    z-index: 4;
+}
+
+.node-connect-handle:hover {
+    transform: translateY(-50%) scale(1.2);
+    background: #1d4ed8;
+}
+
+/* --- Câbles SVG --- */
+.link-path {
+    fill: none;
+    stroke: #475569;
+    stroke-width: 2.5;
+}
+
+.link-path.temp {
+    stroke: #2563eb;
+    stroke-dasharray: 6 4;
+}
+
+.link-delete-group {
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.link-delete-circle {
+    fill: #fff;
+    stroke: #dc2626;
+    stroke-width: 1.5;
+}
+
+.link-delete-group:hover .link-delete-circle {
+    fill: #dc2626;
+}
+
+.link-delete-text {
+    fill: #dc2626;
+    font-size: 11px;
+    font-weight: bold;
+    text-anchor: middle;
+    dominant-baseline: central;
+    user-select: none;
+}
+
+.link-delete-group:hover .link-delete-text {
+    fill: #fff;
+}
+
+/* --- Inspecteur droit --- */
+.editor-inspector {
+    background: #fff;
+    border-left: 1px solid #e2e8f0;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.inspector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.insp-runtime-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.84rem;
+    margin-bottom: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.insp-node-controls {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
+
+.editor-inspector textarea {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.82rem;
+    resize: vertical;
+}
+
+.editor-inspector input:disabled,
+.editor-inspector textarea:disabled {
+    background: #f1f5f9;
+    color: #475569;
+    cursor: not-allowed;
+}
+
+.inspector-footer {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e2e8f0;
+}
